@@ -12,9 +12,16 @@ export function App() {
   const [busy, setBusy] = useState(false);
   const [lastAction, setLastAction] = useState("Choose your role to start a new game.");
   const [showConstitution, setShowConstitution] = useState(false);
+  const [isFullscreen, setIsFullscreen] = useState(false);
   const [eventQueue, setEventQueue] = useState<Array<{ id: number; message: string; kind: string }>>([]);
   const [activeEvent, setActiveEvent] = useState<{ id: number; message: string; kind: string } | null>(null);
   const lastSeenEventId = useRef<number | null>(null);
+
+  useEffect(() => {
+    const syncFullscreen = () => setIsFullscreen(Boolean(document.fullscreenElement));
+    document.addEventListener("fullscreenchange", syncFullscreen);
+    return () => document.removeEventListener("fullscreenchange", syncFullscreen);
+  }, []);
 
   useEffect(() => {
     if (!game || game.phase !== "awaiting-roll" || isHumanTurn(game) || activeEvent || eventQueue.length > 0) return;
@@ -80,7 +87,18 @@ export function App() {
     setGame(endTurn(game));
     setLastAction("Your turn ended. The computer opponents will play automatically.");
   }
+  async function toggleFullscreen() {
+    const shell = document.querySelector(".game-shell") as HTMLElement | null;
+    try {
+      if (document.fullscreenElement) await document.exitFullscreen();
+      else if (shell?.requestFullscreen) await shell.requestFullscreen();
+    } catch {
+      setLastAction("Fullscreen is not available in this browser.");
+    }
+  }
   function restart() {
+    if (document.fullscreenElement) void document.exitFullscreen();
+    setIsFullscreen(false);
     setGame(null);
     setBusy(false);
     setLastAction("Choose your role to start a new game.");
@@ -131,7 +149,7 @@ export function App() {
     <section className="game-layout">
     <section className="panel log-panel"><div className="panel-label">THE OFFICIAL RECORD <span>RECENT EVENTS</span></div><div className="event-list">{[...game.events].reverse().map((event) => <div className={`event event-${event.kind}`} key={event.id}><span>{String(event.id).padStart(3,"0")}</span><p>{event.message}</p></div>)}</div></section>
       <div className="board-wrap">
-        <div className="board-heading"><span>THE REPUBLIC OF OPPORTUNITY</span><span>40 SPACES</span></div>
+        <div className="board-heading"><span>THE REPUBLIC OF OPPORTUNITY</span><span className="board-heading-actions"><span>40 SPACES</span><button className="fullscreen-button" onClick={toggleFullscreen} aria-label={isFullscreen ? "Exit fullscreen" : "Enter fullscreen"}>{isFullscreen ? "EXIT FULLSCREEN ↙" : "FULLSCREEN ↗"}</button></span></div>
         <div className="board-grid">
           {BOARD.map((space, index) => {
             const occupants = game.players.filter((player) => player.position === index);
