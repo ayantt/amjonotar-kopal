@@ -190,7 +190,7 @@ function resolveCard(state: GameState, playerId: string, deck: "community" | "ch
   const player = state.players.find((p) => p.id === playerId);
   if (!player) return state;
   const index = state.cardDrawCounts[deck];
-  const card = drawCard(deck, player.role, index);
+  const card = drawCard(deck, index);
   let next: GameState = { ...state, cardDrawCounts: { ...state.cardDrawCounts, [deck]: index + 1 } };
   next = addEvent(next, `${player.name} drew ${card.id}: ${card.title}.`);
   for (const effect of card.effects[player.role]) {
