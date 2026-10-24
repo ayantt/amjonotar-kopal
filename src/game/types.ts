@@ -17,7 +17,8 @@ export type GamePhase = "role-selection" | "awaiting-roll" | "awaiting-end-turn"
 export interface GameEvent { id: number; message: string; kind: "system" | "movement" | "money" | "ai"; }
 export interface GameState {
   schemaVersion: 1; phase: GamePhase; players: Player[]; currentPlayerIndex: number;
-  publicFund: number; cooperativeFund: number; properties: Record<string, PropertyState>;\n  cardDrawCounts: { community: number; chance: number }; extraRollAvailable: boolean;
+  publicFund: number; cooperativeFund: number; properties: Record<string, PropertyState>;
+  cardDrawCounts: { community: number; chance: number }; extraRollAvailable: boolean;
   pendingPropertyId: string | null; events: GameEvent[]; nextEventId: number;
   round: number; winner: string | null;
 }
