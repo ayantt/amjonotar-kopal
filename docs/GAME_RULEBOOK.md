@@ -29,7 +29,7 @@ Citizen on another Citizen's property pays normal development-adjusted rent. Cit
 - Utility charge uses the visitor's roll total: Citizen-controlled utility costs 4× that total; Politician-controlled utility costs 10× plus ৳30. Politician visitors pay no utility charge.
 - Politician visitors pay half rent on Citizen-controlled land. Politician leases collect half land rent. An active leaseholder receives rent instead of the property owner, preventing duplicate payouts. Citizen leases expire after five GO passes; Politician leases are permanent.
 - Income Tax currently charges Citizens ৳100 and the Politician ৳50. Development Levy charges Citizens ৳100 and exempts the Politician. Politician landing on Public Plaza withdraws the available public treasury; other players receive no jackpot.
-- These are initial Phase 2 values. Card effects, cooperative properties, debt/bankruptcy settlement, houses, and victory triggers are not yet active in the engine. If a player cannot pay, the current fallback charges available cash and logs the shortfall; full debt resolution is pending.
+- These are initial Phase 2 values. Card effects and debt/bankruptcy settlement are implemented. Cooperative purchases and victory triggers are now partially implemented; houses, mortgage redemption, and player-directed debt choices remain future work.
 
 ## Implemented card and debt resolution
 
@@ -57,7 +57,7 @@ Citizen landing on Politician-controlled Water Works pays standard charge plus m
 Citizens may use cash, sell assets, mortgage (half purchase price; mortgaged property earns no rent and cannot be developed), or request cooperative rescue. Politician mortgages for full purchase price and still collects rent. Citizen-to-Citizen trades allowed. Selling to Politician requires unanimous active-Citizen approval. If still unable to pay, Citizen goes bankrupt and remaining cash/property transfer to Politician after atomic settlement. Politician cannot bankrupt from ordinary debt; government support covers shortfall and records liability.
 
 ## Cooperative fund and victory
-Citizens may contribute voluntarily to a separate fund; Politician cannot withdraw, tax, or seize it. Majority of active Citizens may approve spending on joint property, development, rescue, or People's Charter. Cooperative property rent enters the fund. Politician landing there pays Chanda contribution.
+Citizens can contribute ৳100 or ৳500 through the UI to a separate fund; the Politician cannot withdraw, tax, or seize it. A Citizen may purchase an unclaimed property from the fund when it can cover the listed price. Cooperative property rent flows into the cooperative fund. The UI supports a majority vote for the People's Charter; once approved with at least ৳1,000 in the fund, the Charter is pending until the next Citizen round. The Citizens must keep all three active, control at least eight properties jointly (including cooperative properties), retain combined cash of at least ৳3,000, and preserve at least ৳1,000 in the cooperative fund for the joint victory to trigger.
 
 **Politician wins** if any trigger occurs:
 1. Controls at least 7 properties, including active Politician leases.
