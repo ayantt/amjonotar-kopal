@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { BOARD } from "../game/board";
-import { createNewGame, endTurn, getCurrentPlayer, isHumanTurn, resolvePropertyAction, rollAndMove, validateSetup } from "../game/engine";
+import { buyCooperativeProperty, contributeToCooperative, createNewGame, endTurn, getCurrentPlayer, isHumanTurn, resolvePropertyAction, rollAndMove, validateSetup, voteForCharter } from "../game/engine";
 import { runAiTurn } from "../game/turns";
 import { getLegalPropertyActions } from "../game/properties";
 import type { GameState, PlayerRole } from "../game/types";
@@ -108,7 +108,16 @@ export function App() {
           {current.controller === "human" ? <div className="actions"><button className="primary-action" onClick={roll} disabled={busy || game.phase !== "awaiting-roll"}>Roll {current.role === "politician" ? "two dice" : "one die"} <span>↗</span></button><button className="secondary-action" onClick={finishTurn} disabled={busy || game.phase !== "awaiting-end-turn" || Boolean(game.pendingPropertyId)}>End turn →</button></div> : <p className="ai-note">{busy ? "Thinking through the next move…" : "Computer turn will begin shortly."}</p>}
         </section>
         <section className="panel players-panel"><div className="panel-label">THE FOUR SEATS</div>{game.players.map((player) => <div className={`player-row ${player.id === current.id ? "selected" : ""}`} key={player.id}><span className={`mini-token ${player.role}`}>{player.controller === "human" ? "Y" : player.role === "politician" ? "P" : player.name.slice(0,1)}</span><div className="player-row-name"><strong>{player.name}</strong><small>{roleName(player.role)} · {player.controller === "human" ? "You" : "AI"}{player.bankrupt ? " · BANKRUPT" : ""}</small></div><strong className="player-cash">{money(player.cash)}</strong><small className="position-label">#{player.position}</small></div>)}</section>
-        <section className="panel funds-panel"><div className="panel-label">THE COMMON POOL</div><div className="fund-row"><span>Public treasury</span><strong>{money(game.publicFund)}</strong></div><div className="fund-row"><span>Citizens' cooperative</span><strong>{money(game.cooperativeFund)}</strong></div><p>These funds are tracked separately. The Politician rules are part of the satire.</p><div className="fund-row"><span>Community cards drawn</span><strong>{game.cardDrawCounts.community}/16</strong></div><div className="fund-row"><span>Chance cards drawn</span><strong>{game.cardDrawCounts.chance}/16</strong></div></section>
+        <section className="panel funds-panel"><div className="panel-label">THE COMMON POOL</div><div className="fund-row"><span>Public treasury</span><strong>{money(game.publicFund)}</strong></div><div className="fund-row"><span>Citizens' cooperative</span><strong>{money(game.cooperativeFund)}</strong></div><p>These funds are tracked separately. The Politician rules are part of the satire.</p>
+          {current.controller === "human" && current.role === "citizen" && <div className="cooperative-actions">
+            <div className="panel-label">ORGANIZE TOGETHER</div>
+            <div className="cooperative-buttons">
+              <button className="secondary-action" disabled={current.cash < 100 || game.phase === "game-over"} onClick={() => setGame((state) => state ? contributeToCooperative(state, current.id, 100) : state)}>Contribute ৳100</button>
+              <button className="secondary-action" disabled={current.cash < 500 || game.phase === "game-over"} onClick={() => setGame((state) => state ? contributeToCooperative(state, current.id, 500) : state)}>Contribute ৳500</button>
+            </div>
+            <button className="primary-action" disabled={game.charterPendingRound !== null || game.charterActivated || game.charterVotes.includes(current.id) || game.cooperativeFund < 1000} onClick={() => setGame((state) => state ? voteForCharter(state, current.id) : state)}>Vote for People's Charter <span>{game.charterVotes.length}/3</span></button>
+            <small>{game.charterPendingRound !== null ? "Charter pending: preserve the fund and victory conditions until the next Citizen round." : "A majority vote and ৳1,000 cooperative fund are required to propose the Charter."}</small>
+          </div>}<div className="fund-row"><span>Community cards drawn</span><strong>{game.cardDrawCounts.community}/16</strong></div><div className="fund-row"><span>Chance cards drawn</span><strong>{game.cardDrawCounts.chance}/16</strong></div></section>
       </aside>
     </section>
     <section className="panel log-panel"><div className="panel-label">THE OFFICIAL RECORD <span>RECENT EVENTS</span></div><div className="event-list">{[...game.events].reverse().slice(0,8).map((event) => <div className={`event event-${event.kind}`} key={event.id}><span>{String(event.id).padStart(3,"0")}</span><p>{event.message}</p></div>)}</div></section>
