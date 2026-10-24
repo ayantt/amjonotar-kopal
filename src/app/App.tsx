@@ -226,7 +226,14 @@ export function App() {
               ? "Railroad rent depends on the railroad holdings and applicable role rules."
               : "Actual rent may differ from base rent depending on the owner's role, lease terms, and any applicable game rules."}</p>
         </div>
-        <footer className="property-modal-footer"><span>THE REPUBLIC OF OPPORTUNITY · SPACE {BOARD.findIndex((space) => space.id === selectedSpace.id)}</span><button className="primary-action" onClick={() => setSelectedPropertyId(null)}>RETURN TO BOARD <span>×</span></button></footer>
+        <footer className="property-modal-footer"><span>THE REPUBLIC OF OPPORTUNITY · SPACE {BOARD.findIndex((space) => space.id === selectedSpace.id)}</span><div className="property-modal-actions">
+          {selectedProperty?.ownerId === current.id && current.controller === "human" && isHumanTurn(game) && !selectedProperty.leaseholderId && !game.cooperativePropertyIds.includes(selectedSpace.id) && selectedSpace.price !== undefined && <button className="sell-property-button" disabled={current.role === "citizen" && (game.players.find((player) => player.role === "politician")?.cash ?? 0) < selectedSpace.price} onClick={() => {
+            const next = sellProperty(game, current.id, selectedSpace.id);
+            setGame(next);
+            setSelectedPropertyId(null);
+          }}>{current.role === "politician" ? "SELL TO GOVERNMENT" : "SELL TO POLITICIAN"} <span>{money(selectedSpace.price)}</span></button>}
+          <button className="primary-action" onClick={() => setSelectedPropertyId(null)}>RETURN TO BOARD <span>×</span></button>
+        </div></footer>
       </section>
     </div>}
     <footer className="site-footer"><span>FICTIONAL POLITICAL SATIRE · NOT A SIMULATION OF ANY SPECIFIC PERSON</span><button onClick={restart}>NEW GAME ↗</button></footer>
