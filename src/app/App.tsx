@@ -7,13 +7,6 @@ import type { GameState, PlayerRole } from "../game/types";
 
 const money = (amount: number) => `৳${amount.toLocaleString("en-BD")}`;
 const roleName = (role: PlayerRole) => role === "politician" ? "Politician" : "Citizen";
-function boardPosition(index: number): { gridRow: number; gridColumn: number } {
-  if (index <= 10) return { gridRow: 11, gridColumn: 11 - index };
-  if (index <= 20) return { gridRow: 21 - index, gridColumn: 1 };
-  if (index <= 30) return { gridRow: 1, gridColumn: index - 19 };
-  return { gridRow: index - 29, gridColumn: 11 };
-}
-
 export function App() {
   const [game, setGame] = useState<GameState | null>(null);
   const [busy, setBusy] = useState(false);
@@ -91,7 +84,7 @@ export function App() {
         <div className="board-grid">
           {BOARD.map((space, index) => {
             const occupants = game.players.filter((player) => player.position === index);
-            return <div style={boardPosition(index)} className={`space space-${space.type} ${space.color ? `color-${space.color}` : ""}`} key={space.id}>
+            return <div className={`space space-${space.type} ${space.color ? `color-${space.color}` : ""}`} key={space.id}>
               <span className="space-index">{String(index).padStart(2, "0")}</span><strong>{space.name}</strong><small>{space.subtitle}</small>
               {space.price !== undefined && <span className="space-price">{money(space.price)}</span>}
               {game.cooperativePropertyIds.includes(space.id) && <small className="ownership-tag">OWN: CITIZENS CO-OP</small>}{game.properties[space.id]?.ownerId && <small className="ownership-tag">OWN: {game.players.find((player) => player.id === game.properties[space.id].ownerId)?.name ?? "Unknown"}</small>}
@@ -99,7 +92,6 @@ export function App() {
               {occupants.length > 0 && <div className="tokens">{occupants.map((player) => <span title={`${player.name} · ${roleName(player.role)}`} key={player.id} className={`token ${player.role} ${player.controller}`}>{player.controller === "human" ? "YOU" : player.role === "politician" ? "P" : player.name.slice(0,1)}</span>)}</div>}
             </div>;
           })}
-          <div className="board-center"><span className="center-kicker">THE REPUBLIC OF</span><strong>OPPORTUNITY</strong><span className="center-stamp">PUBLIC MONEY<br />PRIVATE RULES</span><span className="center-caption">A BOARD GAME FOR FOUR SEATS</span></div>
         </div>
       </div>
       <aside className="sidebar">
