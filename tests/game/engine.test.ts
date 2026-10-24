@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { BOARD_SPACE_COUNT } from "../../src/game/board";
-import { createNewGame, endTurn, getDiceCount, movePlayer, rollDice, rollAndMove, resolvePropertyAction, validateSetup } from "../../src/game/engine";
+import { buyCooperativeProperty, contributeToCooperative, createNewGame, endTurn, getDiceCount, movePlayer, rollDice, rollAndMove, resolvePropertyAction, validateSetup, voteForCharter } from "../../src/game/engine";
 import { runAiTurn } from "../../src/game/turns";
 import { getLegalPropertyActions } from "../../src/game/properties";
 
@@ -206,5 +206,57 @@ describe("turn-changing card effects", () => {
     expect(state.phase).toBe("awaiting-roll");
     expect(state.currentPlayerIndex).toBe(0);
     expect(state.extraRollAvailable).toBe(false);
+  });
+});
+
+describe("cooperative economy and victory", () => {
+  it("moves a Citizen contribution into the separate cooperative fund", () => {
+    const state = createNewGame({ humanRole: "citizen" });
+    const citizen = state.players[1];
+    const next = contributeToCooperative(state, citizen.id, 100);
+    expect(next.players[1].cash).toBe(citizen.cash - 100);
+    expect(next.cooperativeFund).toBe(100);
+    expect(next.publicFund).toBe(0);
+  });
+
+  it("requires a majority and a thousand taka before the Charter is pending", () => {
+    let state = createNewGame({ humanRole: "citizen" });
+    state = { ...state, cooperativeFund: 1_000 };
+    state = voteForCharter(state, "player-2");
+    expect(state.charterPendingRound).toBeNull();
+    state = voteForCharter(state, "player-3");
+    expect(state.charterPendingRound).toBe(1);
+    expect(state.charterVotes).toHaveLength(2);
+  });
+
+  it("allows Citizens to buy an unclaimed property from the cooperative fund", () => {
+    let state = createNewGame({ humanRole: "citizen" });
+    state = { ...state, phase: "awaiting-end-turn", currentPlayerIndex: 1, pendingPropertyId: "old-dhaka", cooperativeFund: 500 };
+    state = buyCooperativeProperty(state, "player-2");
+    expect(state.cooperativePropertyIds).toContain("old-dhaka");
+    expect(state.cooperativeFund).toBe(440);
+    expect(state.pendingPropertyId).toBeNull();
+  });
+
+  it("requires all three Citizens and the fund/property/cash thresholds for a joint victory", () => {
+    let state = createNewGame({ humanRole: "citizen" });
+    const citizenIds = ["player-2", "player-3", "player-4"];
+    const propertyIds = Object.keys(state.properties).slice(0, 8);
+    state = {
+      ...state,
+      phase: "awaiting-end-turn",
+      currentPlayerIndex: 3,
+      cooperativeFund: 1_000,
+      charterVotes: ["player-2", "player-3"],
+      charterPendingRound: 1,
+      properties: Object.fromEntries(Object.entries(state.properties).map(([id, property], index) => [id, propertyIds.includes(id) ? { ...property, ownerId: citizenIds[index % 3] } : property])),
+      players: state.players.map((player) => player.role === "citizen" ? { ...player, cash: 1_100 } : player),
+    };
+    state = endTurn(state);
+    expect(state.currentPlayerIndex).toBe(0);
+    state = { ...state, phase: "awaiting-end-turn", currentPlayerIndex: 0, round: 2 };
+    state = endTurn(state);
+    expect(state.phase).toBe("game-over");
+    expect(state.winner).toBe("citizens");
   });
 });
