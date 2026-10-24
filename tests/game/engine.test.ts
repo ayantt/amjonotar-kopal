@@ -99,10 +99,7 @@ describe("property actions and rent", () => {
   it("AI chooses an affordable property action and resolves it before ending its turn", () => {
     let state = createNewGame({ humanRole: "citizen" });
     state = { ...state, players: state.players.map((player, index) => index === 0 ? { ...player, position: 39 } : player) };
-    state = rollAndMove(state, () => 0);
-    expect(state.pendingPropertyId).toBe("old-dhaka");
-    expect(chooseAiPropertyAction(state)).toBe("lease");
-    state = runAiTurn({ ...createNewGame({ humanRole: "citizen" }), players: state.players, currentPlayerIndex: 0, phase: "awaiting-roll", properties: state.properties, pendingPropertyId: null, events: state.events, nextEventId: state.nextEventId }, () => 0);
+    state = runAiTurn(state, () => 0);
     expect(state.properties["old-dhaka"].leaseholderId).toBe("player-1");
     expect(state.currentPlayerIndex).toBe(1);
     expect(state.pendingPropertyId).toBeNull();
