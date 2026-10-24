@@ -159,3 +159,23 @@ describe("card effects and debt resolution", () => {
     expect(state.players.every((player) => player.cash >= 0)).toBe(true);
   });
 });
+
+describe("role-specific card costs and card inventory", () => {
+  it("contains sixteen cards in each deck", async () => {
+    const { CARD_DECKS } = await import("../../src/game/cards");
+    expect(CARD_DECKS.community).toHaveLength(16);
+    expect(CARD_DECKS.chance).toHaveLength(16);
+  });
+
+  it("applies the Citizen processing fee instead of treating it as income", () => {
+    let state = createNewGame({ humanRole: "citizen" });
+    state = {
+      ...state,
+      currentPlayerIndex: 1,
+      players: state.players.map((player, index) => index === 1 ? { ...player, position: 1 } : player),
+    };
+    const before = state.players[1].cash;
+    state = movePlayer(state, "player-2", 1);
+    expect(state.players[1].cash).toBe(before + 80);
+  });
+});
