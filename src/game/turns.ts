@@ -1,4 +1,5 @@
-import { endTurn, getCurrentPlayer, resolvePropertyAction, rollAndMove } from "./engine";
+import { BOARD as BOARD_FOR_AI } from "./board";
+import { buyCooperativeProperty, contributeToCooperative, endTurn, getCurrentPlayer, resolvePropertyAction, rollAndMove, voteForCharter } from "./engine";
 import { getLegalPropertyActions } from "./properties";
 import type { GameState } from "./types";
 export type RandomSource = () => number;
@@ -43,5 +44,24 @@ export function runAiTurn(state: GameState, random: RandomSource = Math.random):
     }].slice(-100) };
     next = resolvePropertyAction(next, action);
   }
+  if (player.role === "citizen" && !player.bankrupt && next.phase !== "game-over") {
+    if (next.pendingPropertyId) {
+      const pending = next.pendingPropertyId;
+      const space = (awaitBoardSpace(pending));
+      if (space?.price !== undefined && next.cooperativeFund >= space.price && next.charterPendingRound === null) {
+        next = buyCooperativeProperty(next, player.id);
+      }
+    }
+    const currentCitizen = next.players.find((p) => p.id === player.id);
+    if (currentCitizen && currentCitizen.cash >= 1_200 && next.cooperativeFund < 1_000 && next.charterPendingRound === null) {
+      next = contributeToCooperative(next, player.id, Math.min(100, currentCitizen.cash - 1_000));
+    }
+    if (next.cooperativeFund >= 1_000 && next.charterPendingRound === null && !next.charterActivated && !next.charterVotes.includes(player.id)) {
+      next = voteForCharter(next, player.id);
+    }
+  }
   return endTurn(next);
+}
+function awaitBoardSpace(spaceId: string) {
+  return BOARD_FOR_AI.find((space) => space.id === spaceId);
 }
