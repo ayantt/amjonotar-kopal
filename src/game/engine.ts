@@ -102,7 +102,7 @@ function pay(state: GameState, payerId: string, recipientId: string | null, amou
     remaining -= cashPaid;
   }
   if (remaining > 0) {
-    const assets = Object.values(next.properties).filter((property) => property.ownerId === payerId && !property.mortgaged);
+    const assets = Object.values(next.properties).filter((property) => property.ownerId === payerId && !property.mortgaged && !property.leaseholderId);
     for (const asset of assets) {
       if (remaining <= 0) break;
       const space = BOARD.find((s) => s.id === asset.spaceId);
@@ -373,12 +373,12 @@ export interface MortgageTerms {
 }
 export function getMortgageTerms(role: Player["role"], price: number): MortgageTerms {
   const grossAdvance = role === "politician" ? price : Math.floor(price / 2);
-  const processingFee = role === "politician" ? 0 : Math.floor(price * 0.05);
+  const processingFee = role === "politician" ? 0 : Math.floor(grossAdvance * 0.05);
   return {
     grossAdvance,
     processingFee,
     netAdvance: grossAdvance - processingFee,
-    redemptionAmount: Math.ceil(price * (role === "politician" ? 1.08 : 1.1)),
+    redemptionAmount: Math.ceil(grossAdvance * (role === "politician" ? 1.08 : 1.1)),
   };
 }
 export function mortgageProperty(state: GameState, playerId: string, spaceId: string): GameState {
