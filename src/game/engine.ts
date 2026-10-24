@@ -41,7 +41,7 @@ export function contributeToCooperative(state: GameState, playerId: string, amou
   const player = state.players.find((p) => p.id === playerId);
   if (state.phase === "game-over" || !player || player.id !== getCurrentPlayer(state).id || player.role !== "citizen" || !player.active || player.bankrupt) throw new Error("Only the current active Citizen can contribute.");
   if (!Number.isInteger(amount) || amount <= 0 || player.cash < amount) throw new Error("Contribution must be positive and affordable.");
-  const next = { ...state, cooperativeFund: state.cooperativeFund + amount,
+  let next = { ...state, cooperativeFund: state.cooperativeFund + amount,
     players: state.players.map((p) => p.id === playerId ? { ...p, cash: p.cash - amount } : p) };
   next = addEvent(next, `${player.name} contributed ৳${amount} to the Citizens' cooperative fund.`, "money");
   return checkVictory(next);
