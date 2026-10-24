@@ -11,7 +11,7 @@ export interface Player {
   active: boolean;
   lastRoll: number[];
 }
-export type GamePhase = "role-selection" | "awaiting-roll" | "game-over";
+export type GamePhase = "role-selection" | "awaiting-roll" | "awaiting-end-turn" | "game-over";
 export interface GameEvent {
   id: number;
   message: string;
@@ -29,6 +29,6 @@ export interface GameState {
   round: number;
   winner: string | null;
 }
-export interface NewGameOptions { humanRole: PlayerRole; random?: () => number; }
+export interface NewGameOptions { humanRole: PlayerRole; }
 export type DiceRoller = (count: number, random: () => number) => number[];
 export type SpaceResolver = (space: BoardSpace, player: Player, state: GameState) => GameState;
