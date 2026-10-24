@@ -57,8 +57,14 @@ Citizen on another Citizen's property pays normal development-adjusted rent. Cit
 - Bankruptcy ends the game if the Politician goes bankrupt (Citizens win) or when two Citizens go bankrupt (Politician wins). The cooperative Citizen victory condition is implemented in initial form as described below; mortgage redemption is implemented.
 - The event log records card draws, payments, mortgage actions, bankruptcy, and skip-turn effects. The board UI shows deck draw counts and a game-over message.
 
-## Housing (later phase)
-Levels: none (1×), 1 house (2×), 2 houses (3×), 3 houses (4×), hotel (6×). Incremental Citizen costs: ৳200, ৳300, ৳400, ৳600. Citizens must own full color group and build evenly. Citizen maintenance: ৳50 per house each GO pass; hotel maintenance provisionally ৳200 per GO pass. Politician may build on owned properties without group completion, pays half upgrade cost, and may upgrade directly to hotel. No building on another player's property; permit-fee idea is deferred.
+## Houses and hotels
+
+- Only individually owned land spaces (not railroads or utilities) may be developed. The property must not be mortgaged, leased, or held by the Citizens' Cooperative.
+- Rent multiplier: undeveloped 1×; one house 2×; two houses 3×; three houses 4×; hotel 6×. The multiplier applies to land rent before the existing role-based rent adjustment.
+- Citizen building costs are incremental: first house ৳200, second ৳300, third ৳400, and hotel upgrade ৳600. Citizens must own every property in the same color group and build evenly; they must have three houses on a property before upgrading it to a hotel.
+- Politicians may build on any land they own without completing a color group, pay half the listed upgrade cost, and may build a hotel directly from an undeveloped property. Political privilege is exempt from building maintenance.
+- Each time a Citizen passes Shurur Line, maintenance is charged for every building they own: ৳50 per house and ৳200 per hotel. Maintenance is paid from cash and uses the existing debt/mortgage/bankruptcy resolver if the player cannot cover it.
+- Building actions are available to the human player during their own turn from the property detail panel. AI building strategy is deferred; permit-fee mechanics remain deferred.
 
 ## Railroads and utilities (later phase)
 Citizen pays normal fare on Citizen-controlled railroad, double fare on Politician-controlled railroad. Politician pays nothing; if Citizen-controlled, Politician pays half fare as “Public Service Contribution.” Citizens pay utility charge plus service-adjustment fee if Politician-controlled. Politician pays nothing and collects half utility charge from any Citizen landing there, or full charge plus adjustment if Politician-controlled. Store formulas in data.
