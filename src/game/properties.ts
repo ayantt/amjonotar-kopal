@@ -12,7 +12,7 @@ export function createPropertyLedger(): Record<string, PropertyState> {
   }]));
 }
 export function getLegalPropertyActions(state: GameState, player: Player): LegalPropertyAction[] {
-  const space = BOARD.find((item) => item.id === player.position) ?? BOARD[0];
+  const space = BOARD[player.position] ?? BOARD[0];
   if (!isPurchasable(space.id) || state.pendingPropertyId !== space.id) return [];
   const property = state.properties[space.id];
   if (!property || property.ownerId || property.leaseholderId || !space.price) return [{ type: "decline", spaceId: space.id, cost: 0, label: "Continue" }];
