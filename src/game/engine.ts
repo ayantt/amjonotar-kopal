@@ -74,7 +74,7 @@ export function buyCooperativeProperty(state: GameState, playerId: string): Game
 export function createNewGame({ humanRole }: NewGameOptions): GameState {
   const roles: PlayerRole[] = ["politician", "citizen", "citizen", "citizen"];
   const humanIndex = humanRole === "politician" ? 0 : 1;
-  const names = ["The Honourable Leader", "Asha", "Rafi", "Mina"];
+  const names = ["The Honourable Leader", "Kamal", "Joshim", "Shabana"];
   const players = roles.map((role, index) => makePlayer(`player-${index + 1}`, index === humanIndex ? "You" : (role === "politician" ? "The Honourable Leader" : names[index]), role, index === humanIndex ? "human" : "ai"));
   const initial: GameState = { schemaVersion: 1, phase: "awaiting-roll", players, currentPlayerIndex: 0, publicFund: 0, cooperativeFund: 0, properties: createPropertyLedger(), cooperativePropertyIds: [], charterVotes: [], charterPendingRound: null, charterActivated: false, pendingPropertyId: null, cardDrawCounts: { community: 0, chance: 0 }, extraRollAvailable: false, events: [], nextEventId: 1, round: 1, winner: null };
   const state = addEvent(initial, `Game started. You play as ${humanRole === "politician" ? "Politician" : "Citizen"}; three opponents are computer-controlled.`);
