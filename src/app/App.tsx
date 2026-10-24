@@ -117,29 +117,6 @@ export function App() {
         <button className="role-card citizen-card" onClick={() => startGame("citizen")}><span className="role-number">02 / PEOPLE</span><strong>Play as Citizen</strong><span>One die. Three citizens. Your best chance is to work together.</span><span className="button-copy">JOIN THE PUBLIC ↗</span></button>
       </div>
     </section>
-    {selectedSpace && <div className="property-modal-backdrop" role="presentation" onClick={() => setSelectedPropertyId(null)}>
-      <section className="property-modal" role="dialog" aria-modal="true" aria-labelledby="property-modal-title" onClick={(event) => event.stopPropagation()}>
-        <header className={`property-modal-header ${selectedSpace.color ? `color-${selectedSpace.color}` : ""}`}>
-          <div><span className="property-modal-kicker">PROPERTY REGISTER · {selectedSpace.type.toUpperCase()}</span><h2 id="property-modal-title">{selectedSpace.name}</h2><p>{selectedSpace.subtitle}</p></div>
-          <button className="constitution-close" onClick={() => setSelectedPropertyId(null)} aria-label="Close property details">CLOSE ×</button>
-        </header>
-        <div className="property-modal-body">
-          <div className="property-detail-grid">
-            <div className="property-detail"><span>LISTED PRICE</span><strong>{selectedSpace.price !== undefined ? money(selectedSpace.price) : "—"}</strong></div>
-            <div className="property-detail"><span>BASE RENT</span><strong>{selectedSpace.type === "utility" ? "Variable" : selectedSpace.price !== undefined ? money(getBaseRent(selectedSpace.id)) : "—"}</strong></div>
-            <div className="property-detail"><span>OWNER</span><strong>{game.cooperativePropertyIds.includes(selectedSpace.id) ? "Citizens' Cooperative" : selectedOwner?.name ?? "Unclaimed"}</strong></div>
-            <div className="property-detail"><span>LEASEHOLDER</span><strong>{selectedLeaseholder ? (selectedLeaseholder.role === "politician" ? "Leader's Icon" : selectedLeaseholder.name) : "None"}</strong></div>
-          </div>
-          <div className="property-detail-status"><span>STATUS</span><strong>{selectedProperty?.mortgaged ? "Mortgaged — no rent collected" : game.cooperativePropertyIds.includes(selectedSpace.id) ? "Shared cooperative property" : selectedOwner ? "Owned" : selectedLeaseholder ? "Leased" : "Available to purchase or lease"}</strong></div>
-          <p className="property-detail-note">{selectedSpace.type === "utility"
-            ? "Utility rent is calculated from the player's dice roll and the applicable role rules."
-            : selectedSpace.type === "railroad"
-              ? "Railroad rent depends on the railroad holdings and applicable role rules."
-              : "Actual rent may differ from base rent depending on the owner's role, lease terms, and any applicable game rules."}</p>
-        </div>
-        <footer className="property-modal-footer"><span>THE REPUBLIC OF OPPORTUNITY · SPACE {BOARD.findIndex((space) => space.id === selectedSpace.id)}</span><button className="primary-action" onClick={() => setSelectedPropertyId(null)}>RETURN TO BOARD <span>×</span></button></footer>
-      </section>
-    </div>}
     <footer className="site-footer"><span>FICTIONAL POLITICAL SATIRE</span><span>4 SEATS · 1 HUMAN · 3 AI</span></footer>
   </main>;
 
@@ -229,6 +206,29 @@ export function App() {
           </div>}<div className="fund-row"><span>Community cards drawn</span><strong>{game.cardDrawCounts.community}/16</strong></div><div className="fund-row"><span>Chance cards drawn</span><strong>{game.cardDrawCounts.chance}/16</strong></div></section>
       </aside>
     </section>
+    {selectedSpace && <div className="property-modal-backdrop" role="presentation" onClick={() => setSelectedPropertyId(null)}>
+      <section className="property-modal" role="dialog" aria-modal="true" aria-labelledby="property-modal-title" onClick={(event) => event.stopPropagation()}>
+        <header className={`property-modal-header ${selectedSpace.color ? `color-${selectedSpace.color}` : ""}`}>
+          <div><span className="property-modal-kicker">PROPERTY REGISTER · {selectedSpace.type.toUpperCase()}</span><h2 id="property-modal-title">{selectedSpace.name}</h2><p>{selectedSpace.subtitle}</p></div>
+          <button className="constitution-close" onClick={() => setSelectedPropertyId(null)} aria-label="Close property details">CLOSE ×</button>
+        </header>
+        <div className="property-modal-body">
+          <div className="property-detail-grid">
+            <div className="property-detail"><span>LISTED PRICE</span><strong>{selectedSpace.price !== undefined ? money(selectedSpace.price) : "—"}</strong></div>
+            <div className="property-detail"><span>BASE RENT</span><strong>{selectedSpace.type === "utility" ? "Variable" : selectedSpace.price !== undefined ? money(getBaseRent(selectedSpace.id)) : "—"}</strong></div>
+            <div className="property-detail"><span>OWNER</span><strong>{game.cooperativePropertyIds.includes(selectedSpace.id) ? "Citizens' Cooperative" : selectedOwner?.name ?? "Unclaimed"}</strong></div>
+            <div className="property-detail"><span>LEASEHOLDER</span><strong>{selectedLeaseholder ? (selectedLeaseholder.role === "politician" ? "Leader's Icon" : selectedLeaseholder.name) : "None"}</strong></div>
+          </div>
+          <div className="property-detail-status"><span>STATUS</span><strong>{selectedProperty?.mortgaged ? "Mortgaged — no rent collected" : game.cooperativePropertyIds.includes(selectedSpace.id) ? "Shared cooperative property" : selectedOwner ? "Owned" : selectedLeaseholder ? "Leased" : "Available to purchase or lease"}</strong></div>
+          <p className="property-detail-note">{selectedSpace.type === "utility"
+            ? "Utility rent is calculated from the player's dice roll and the applicable role rules."
+            : selectedSpace.type === "railroad"
+              ? "Railroad rent depends on the railroad holdings and applicable role rules."
+              : "Actual rent may differ from base rent depending on the owner's role, lease terms, and any applicable game rules."}</p>
+        </div>
+        <footer className="property-modal-footer"><span>THE REPUBLIC OF OPPORTUNITY · SPACE {BOARD.findIndex((space) => space.id === selectedSpace.id)}</span><button className="primary-action" onClick={() => setSelectedPropertyId(null)}>RETURN TO BOARD <span>×</span></button></footer>
+      </section>
+    </div>}
     <footer className="site-footer"><span>FICTIONAL POLITICAL SATIRE · NOT A SIMULATION OF ANY SPECIFIC PERSON</span><button onClick={restart}>NEW GAME ↗</button></footer>
   </main>;
 }
