@@ -37,6 +37,40 @@ function checkVictory(state: GameState, atCitizenRoundStart = false): GameState 
 function makePlayer(id: string, name: string, role: PlayerRole, controller: Controller): Player {
   return { id, name, role, controller, cash: role === "politician" ? GAME_RULES.politicianStartingCash : GAME_RULES.citizenStartingCash, position: 0, active: true, lastRoll: [], goPasses: 0, bankrupt: false, skipTurns: 0 };
 }
+export function contributeToCooperative(state: GameState, playerId: string, amount: number): GameState {
+  const player = state.players.find((p) => p.id === playerId);
+  if (!player || player.role !== "citizen" || !player.active || player.bankrupt) throw new Error("Only an active Citizen can contribute.");
+  if (!Number.isInteger(amount) || amount <= 0 || player.cash < amount) throw new Error("Contribution must be positive and affordable.");
+  const next = { ...state, cooperativeFund: state.cooperativeFund + amount,
+    players: state.players.map((p) => p.id === playerId ? { ...p, cash: p.cash - amount } : p) };
+  return addEvent(next, `${player.name} contributed ৳${amount} to the Citizens' cooperative fund.`, "money");
+}
+export function voteForCharter(state: GameState, playerId: string): GameState {
+  const player = state.players.find((p) => p.id === playerId);
+  if (!player || player.role !== "citizen" || !player.active || player.bankrupt) throw new Error("Only an active Citizen may vote for the Charter.");
+  if (state.charterPendingRound !== null || state.charterActivated) throw new Error("The Charter is already pending or activated.");
+  const votes = state.charterVotes.includes(playerId) ? state.charterVotes : [...state.charterVotes, playerId];
+  let next = addEvent({ ...state, charterVotes: votes }, `${player.name} voted for the People's Charter (${votes.length} vote(s)).`);
+  const majority = Math.floor(activeCitizens(state).length / 2) + 1;
+  if (votes.length >= majority && next.cooperativeFund >= 1_000) {
+    next = { ...next, charterPendingRound: state.round };
+    next = addEvent(next, "A majority approved the Charter. Preserve the victory conditions until the next Citizen round.");
+  } else if (votes.length >= majority) {
+    next = addEvent(next, "The vote passed, but the cooperative fund must reach ৳1,000 before the Charter can be proposed.");
+  }
+  return next;
+}
+export function buyCooperativeProperty(state: GameState, playerId: string): GameState {
+  const player = state.players.find((p) => p.id === playerId);
+  const space = BOARD.find((s) => s.id === state.pendingPropertyId);
+  if (state.phase !== "awaiting-end-turn" || !state.pendingPropertyId || !space || !player || player.role !== "citizen") throw new Error("A Citizen must be at an unclaimed property to propose a cooperative purchase.");
+  const cost = space.price ?? 0;
+  const property = state.properties[space.id];
+  if (!property || property.ownerId || property.leaseholderId || state.cooperativePropertyIds.includes(space.id) || cost <= 0 || state.cooperativeFund < cost) throw new Error("The cooperative fund cannot afford this property.");
+  let next: GameState = { ...state, cooperativeFund: state.cooperativeFund - cost, cooperativePropertyIds: [...state.cooperativePropertyIds, space.id], pendingPropertyId: null };
+  next = addEvent(next, `Citizens' cooperative bought ${space.name} for ৳${cost}; future rent goes to the shared fund.`, "money");
+  return checkVictory(next);
+}
 export function createNewGame({ humanRole }: NewGameOptions): GameState {
   const roles: PlayerRole[] = ["politician", "citizen", "citizen", "citizen"];
   const humanIndex = humanRole === "politician" ? 0 : 1;
