@@ -231,7 +231,7 @@ export function App() {
             const next = sellProperty(game, current.id, selectedSpace.id);
             setGame(next);
             setSelectedPropertyId(null);
-          }}>{current.role === "politician" ? "SELL TO GOVERNMENT" : "SELL TO POLITICIAN"} <span>{money(selectedSpace.price)}</span></button>}
+          }}>{current.role === "politician" ? "SELL TO GOVERNMENT" : (game.players.find((player) => player.role === "politician")?.cash ?? 0) < selectedSpace.price ? "POLITICIAN NEEDS CASH" : "SELL TO POLITICIAN"} <span>{money(selectedSpace.price)}</span></button>}
           <button className="primary-action" onClick={() => setSelectedPropertyId(null)}>RETURN TO BOARD <span>×</span></button>
         </div></footer>
       </section>
