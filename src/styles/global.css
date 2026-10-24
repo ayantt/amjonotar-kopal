@@ -241,3 +241,10 @@
 .property-modal-footer>span{font-size:.55rem;font-weight:900;letter-spacing:.08em;color:#716751}
 .property-modal-footer .primary-action{width:auto;max-width:100%;font-size:.62rem;padding:.7rem .8rem}
 @media(max-width:580px){.property-modal-backdrop{padding:.4rem}.property-modal-header{padding:1rem}.property-modal-body{padding:1rem}.property-detail{padding:.65rem}.property-detail strong{font-size:.9rem}.property-modal-footer{align-items:flex-start;flex-direction:column;padding:.8rem 1rem}}
+
+/* Property sale controls */
+.property-modal-actions{display:flex;align-items:center;justify-content:flex-end;gap:.55rem;flex-wrap:wrap}
+.sell-property-button{border:1px solid #a44735;background:#a44735;color:#fff8e9;padding:.7rem .8rem;font-size:.62rem;font-weight:900;letter-spacing:.04em;display:flex;align-items:center;gap:.65rem}
+.sell-property-button span{white-space:nowrap}
+.sell-property-button:disabled{opacity:.42;cursor:not-allowed}
+@media(max-width:580px){.property-modal-actions{width:100%;flex-direction:column;align-items:stretch}.property-modal-actions button{width:100%;justify-content:space-between}}
