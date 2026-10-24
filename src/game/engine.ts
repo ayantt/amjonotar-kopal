@@ -134,10 +134,8 @@ function applyCardEffect(state: GameState, playerId: string, effect: CardEffect,
       return addEvent(next, `${player.name} collected ৳${amount} from the public fund; any unavailable balance was waived.`, "money");
     }
     if (effect.recipient === "public-payment-if-available") {
-      const amount = Math.min(next.publicFund, effect.amount);
-      if (amount === 0) return addEvent(next, `${player.name} had no public-fund payment due; no liability was carried forward.`);
-      next = { ...next, players: next.players.map((p) => p.id === playerId ? { ...p, cash: p.cash - Math.min(p.cash, amount) } : p), publicFund: next.publicFund + Math.min(player.cash, amount) };
-      return addEvent(next, `${player.name} paid ৳${Math.min(player.cash, amount)} into the public fund from an available-balance card.`, "money");
+      if (next.publicFund < effect.amount) return addEvent(next, `${player.name} had no payment due because the public-fund condition was not met; no liability was carried forward.`);
+      return pay(next, playerId, null, effect.amount, "card payment to public fund");
     }
     for (const citizen of next.players.filter((p) => p.role === "citizen" && p.active && p.id !== playerId)) {
       next = pay(next, citizen.id, playerId, effect.amount, "card collection");
