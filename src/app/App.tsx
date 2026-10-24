@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { BOARD } from "../game/board";
 import { buyCooperativeProperty, contributeToCooperative, createNewGame, endTurn, getCurrentPlayer, isHumanTurn, resolvePropertyAction, rollAndMove, validateSetup, voteForCharter } from "../game/engine";
 import { runAiTurn } from "../game/turns";
@@ -12,9 +12,12 @@ export function App() {
   const [busy, setBusy] = useState(false);
   const [lastAction, setLastAction] = useState("Choose your role to start a new game.");
   const [showConstitution, setShowConstitution] = useState(false);
+  const [eventQueue, setEventQueue] = useState<Array<{ id: number; message: string; kind: string }>>([]);
+  const [activeEvent, setActiveEvent] = useState<{ id: number; message: string; kind: string } | null>(null);
+  const lastSeenEventId = useRef<number | null>(null);
 
   useEffect(() => {
-    if (!game || game.phase !== "awaiting-roll" || isHumanTurn(game)) return;
+    if (!game || game.phase !== "awaiting-roll" || isHumanTurn(game) || activeEvent || eventQueue.length > 0) return;
     setBusy(true);
     const timer = window.setTimeout(() => {
       setGame((current) => {
@@ -26,12 +29,41 @@ export function App() {
       setBusy(false);
     }, 650);
     return () => window.clearTimeout(timer);
+  }, [game, activeEvent, eventQueue.length]);
+
+  useEffect(() => {
+    if (!game || game.events.length === 0) return;
+    const latestId = game.events[game.events.length - 1].id;
+    if (lastSeenEventId.current === null) {
+      lastSeenEventId.current = latestId;
+      return;
+    }
+    const newEvents = game.events.filter((event) => event.id > (lastSeenEventId.current ?? 0));
+    if (newEvents.length > 0) {
+      lastSeenEventId.current = latestId;
+      setEventQueue((queue) => [...queue, ...newEvents.map((event) => ({ id: event.id, message: event.message, kind: event.kind }))]);
+    }
   }, [game]);
+
+  useEffect(() => {
+    if (activeEvent || eventQueue.length === 0) return;
+    setActiveEvent(eventQueue[0]);
+    setEventQueue((queue) => queue.slice(1));
+  }, [activeEvent, eventQueue]);
+
+  useEffect(() => {
+    if (!activeEvent) return;
+    const timer = window.setTimeout(() => setActiveEvent(null), 2600);
+    return () => window.clearTimeout(timer);
+  }, [activeEvent]);
 
   function startGame(role: PlayerRole) {
     const next = createNewGame({ humanRole: role });
     if (!validateSetup(next)) throw new Error("Invalid four-player setup.");
     setGame(next);
+    lastSeenEventId.current = null;
+    setEventQueue([]);
+    setActiveEvent(null);
     setBusy(false);
     setLastAction(`Game started. You are the ${roleName(role)}.`);
   }
@@ -126,6 +158,11 @@ export function App() {
             <div className="center-status">{current.name} · {roleName(current.role)} · {money(current.cash)}</div>
           </div>
         </div>
+        {activeEvent && <div className={`board-event-popup event-popup-${activeEvent.kind}`} role="status" aria-live="polite" key={activeEvent.id}>
+          <span className="board-event-kicker">OFFICIAL RECORD · EVENT {String(activeEvent.id).padStart(3, "0")}</span>
+          <p>{activeEvent.message}</p>
+          <button type="button" aria-label="Dismiss event" onClick={() => setActiveEvent(null)}>DISMISS ×</button>
+        </div>}
       </div>
       <aside className="sidebar">
         <section className="panel current-panel"><div className="panel-label">NOW PLAYING</div><div className="current-player"><span className={`large-token ${current.role}`}>{current.controller === "human" ? "YOU" : current.role === "politician" ? "P" : current.name.slice(0,1)}</span><div><h2>{current.name}</h2><p>{roleName(current.role)} · {current.controller === "human" ? "Human player" : "Computer opponent"}</p></div></div><div className="cash-line"><span>AVAILABLE CASH</span><strong>{money(current.cash)}</strong></div>
