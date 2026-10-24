@@ -32,7 +32,7 @@ Exit: several laps can be played with all AI turns resolving reliably and proper
 ## Phase 4 — Cooperation/economy
 - [x] Citizen contributions, Charter voting, cooperative property purchases, and shared-rent transfers.
 - [ ] Housing, mortgage redemption, debt-choice UI, and broader bankruptcy edge-case coverage.
-- [ ] AI Citizens coordinate through explicit shared rules and actions.
+- [x] AI Citizens contribute when affordable, vote on the Charter, and can purchase cooperative property from the shared fund.
 - [x] Politician property/wealth/bankruptcy victory and Citizen Charter victory conditions, with initial boundary tests.
 - [ ] Simulate balance; tune values and expand full-game playtesting.
 
