@@ -84,7 +84,14 @@ export function App() {
         <div className="board-grid">
           {BOARD.map((space, index) => {
             const occupants = game.players.filter((player) => player.position === index);
-            return <div className={`space space-${space.type} ${space.color ? `color-${space.color}` : ""}`} key={space.id}>
+            const edge = index <= 10
+              ? { gridColumn: 11 - index, gridRow: 11 }
+              : index <= 19
+                ? { gridColumn: 1, gridRow: 21 - index }
+                : index <= 30
+                  ? { gridColumn: index - 19, gridRow: 1 }
+                  : { gridColumn: 11, gridRow: index - 29 };
+            return <div style={edge} className={`space space-${space.type} ${space.color ? `color-${space.color}` : ""}`} key={space.id}>
               <span className="space-index">{String(index).padStart(2, "0")}</span><strong>{space.name}</strong><small>{space.subtitle}</small>
               {space.price !== undefined && <span className="space-price">{money(space.price)}</span>}
               {game.cooperativePropertyIds.includes(space.id) && <small className="ownership-tag">OWN: CITIZENS CO-OP</small>}{game.properties[space.id]?.ownerId && <small className="ownership-tag">OWN: {game.players.find((player) => player.id === game.properties[space.id].ownerId)?.name ?? "Unknown"}</small>}
@@ -92,6 +99,13 @@ export function App() {
               {occupants.length > 0 && <div className="tokens">{occupants.map((player) => <span title={`${player.name} · ${roleName(player.role)}`} key={player.id} className={`token ${player.role} ${player.controller}`}>{player.controller === "human" ? "YOU" : player.role === "politician" ? "P" : player.name.slice(0,1)}</span>)}</div>}
             </div>;
           })}
+          <div className="board-center">
+            <span className="center-kicker">THE REPUBLIC OF OPPORTUNITY</span>
+            <strong>আমজনতার <em>কপাল</em></strong>
+            <span className="center-stamp">THE BOARD<br />IS RIGGED</span>
+            <span className="center-caption">FORTY SPACES · FOUR SEATS · ONE CROOKED SYSTEM</span>
+            <div className="center-status">{current.name} · {roleName(current.role)} · {money(current.cash)}</div>
+          </div>
         </div>
       </div>
       <aside className="sidebar">
