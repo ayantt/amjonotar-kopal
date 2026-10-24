@@ -2,6 +2,8 @@ import { useEffect, useState } from "react";
 import { BOARD } from "../game/board";
 import { createNewGame, endTurn, getCurrentPlayer, isHumanTurn, rollAndMove, validateSetup } from "../game/engine";
 import { runAiTurn } from "../game/turns";
+import { getLegalPropertyActions } from "../game/properties";
+import { resolvePropertyAction } from "../game/engine";
 import type { GameState, PlayerRole } from "../game/types";
 
 const money = (amount: number) => `৳${amount.toLocaleString("en-BD")}`;
@@ -75,6 +77,7 @@ export function App() {
   </main>;
 
   const current = getCurrentPlayer(game);
+  const propertyActions = game.pendingPropertyId ? getLegalPropertyActions(game, current) : [];
   return <main className="game-shell">
     <header className="game-header">
       <button className="wordmark" onClick={restart} aria-label="Return to role selection">আমজনতার কপাল<span>BACK TO MENU ↗</span></button>
@@ -99,7 +102,8 @@ export function App() {
       </div>
       <aside className="sidebar">
         <section className="panel current-panel"><div className="panel-label">NOW PLAYING</div><div className="current-player"><span className={`large-token ${current.role}`}>{current.controller === "human" ? "YOU" : current.role === "politician" ? "P" : current.name.slice(0,1)}</span><div><h2>{current.name}</h2><p>{roleName(current.role)} · {current.controller === "human" ? "Human player" : "Computer opponent"}</p></div></div><div className="cash-line"><span>AVAILABLE CASH</span><strong>{money(current.cash)}</strong></div>
-          {current.controller === "human" ? <div className="actions"><button className="primary-action" onClick={roll} disabled={busy || game.phase !== "awaiting-roll"}>Roll {current.role === "politician" ? "two dice" : "one die"} <span>↗</span></button><button className="secondary-action" onClick={finishTurn} disabled={busy || game.phase !== "awaiting-end-turn"}>End turn →</button></div> : <p className="ai-note">{busy ? "Thinking through the next move…" : "Computer turn will begin shortly."}</p>}
+          {current.controller === "human" && game.pendingPropertyId && <div className="property-decision"><div className="panel-label">PROPERTY DECISION</div><strong>{BOARD.find((space) => space.id === game.pendingPropertyId)?.name}</strong><p>Choose what to do with this unclaimed space.</p>{propertyActions.map((action) => <button className={action.type === "decline" ? "secondary-action" : "primary-action"} key={action.type} onClick={() => setGame((state) => state ? resolvePropertyAction(state, action.type) : state)}>{action.label}<span>{action.type === "decline" ? "↷" : money(action.cost)}</span></button>)}</div>}
+          {current.controller === "human" ? <div className="actions"><button className="primary-action" onClick={roll} disabled={busy || game.phase !== "awaiting-roll"}>Roll {current.role === "politician" ? "two dice" : "one die"} <span>↗</span></button><button className="secondary-action" onClick={finishTurn} disabled={busy || game.phase !== "awaiting-end-turn" || Boolean(game.pendingPropertyId)}>End turn →</button></div> : <p className="ai-note">{busy ? "Thinking through the next move…" : "Computer turn will begin shortly."}</p>}
         </section>
         <section className="panel players-panel"><div className="panel-label">THE FOUR SEATS</div>{game.players.map((player) => <div className={`player-row ${player.id === current.id ? "selected" : ""}`} key={player.id}><span className={`mini-token ${player.role}`}>{player.controller === "human" ? "Y" : player.role === "politician" ? "P" : player.name.slice(0,1)}</span><div className="player-row-name"><strong>{player.name}</strong><small>{roleName(player.role)} · {player.controller === "human" ? "You" : "AI"}</small></div><strong className="player-cash">{money(player.cash)}</strong><small className="position-label">#{player.position}</small></div>)}</section>
         <section className="panel funds-panel"><div className="panel-label">THE COMMON POOL</div><div className="fund-row"><span>Public treasury</span><strong>{money(game.publicFund)}</strong></div><div className="fund-row"><span>Citizens' cooperative</span><strong>{money(game.cooperativeFund)}</strong></div><p>These funds are tracked separately. The Politician's special rules are part of the satire.</p></section>
