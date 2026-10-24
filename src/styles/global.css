@@ -134,3 +134,36 @@
 .event-popup-system{border-bottom:5px solid #b28a46}
 @keyframes event-popup-in{from{opacity:0;transform:translate(-50%,-46%)}to{opacity:1;transform:translate(-50%,-50%)}}
 @media(max-width:580px){.board-event-popup{width:84%;padding:1rem 1rem .8rem}.board-event-kicker{font-size:.5rem}.board-event-popup p{font-size:.9rem}}
+
+
+/* Compact landing page so the role selection fits within a typical laptop viewport. */
+.app-shell:not(.game-shell){padding-inline:clamp(1rem,4vw,3rem)}
+.masthead{min-height:56px}
+.hero{margin:clamp(1rem,3vh,2rem) auto clamp(.8rem,2vh,1.4rem)}
+.hero .eyebrow{margin:.4rem 0}
+.hero h1{font-size:clamp(3.4rem,8.5vw,7rem);line-height:.82;margin:.65rem 0}
+.hero .lede{margin:1rem 0 .35rem;font-size:clamp(1.1rem,2.4vw,1.65rem)}
+.hero .intro{margin:.45rem 0;line-height:1.45;font-size:.92rem}
+.role-picks{margin-top:1.2rem;gap:.8rem}
+.role-card{min-height:170px;padding:1rem 1.15rem;gap:.55rem}
+.role-card strong{font-size:clamp(1.2rem,2.3vw,1.7rem)}
+.role-card>span:nth-of-type(2){font-size:.88rem;line-height:1.4}
+.button-copy{padding-top:.5rem}
+.site-footer{padding:.8rem 0}
+@media(max-height:800px) and (min-width:581px){
+  .masthead{min-height:48px}
+  .hero{margin:.8rem auto .7rem}
+  .hero h1{font-size:clamp(3.2rem,7vw,5.8rem);margin:.45rem 0}
+  .hero .lede{margin:.65rem 0 .25rem}
+  .hero .intro{font-size:.84rem}
+  .role-picks{margin-top:.8rem}
+  .role-card{min-height:145px;padding:.8rem 1rem;gap:.4rem}
+  .site-footer{padding:.55rem 0}
+}
+@media(max-width:580px){
+  .hero{margin:1.3rem auto 1rem}
+  .hero h1{font-size:clamp(4rem,18vw,6rem)}
+  .role-picks{margin-top:1.2rem}
+  .role-card{min-height:145px;padding:1rem}
+  .site-footer{padding:.75rem 0}
+}
