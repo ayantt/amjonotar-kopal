@@ -75,9 +75,12 @@ function pay(state: GameState, payerId: string, recipientId: string | null, amou
         ? [id, { ...property, ownerId: assetRecipient, leaseholderId: null, leaseExpiresAtGoPass: null, mortgaged: false }]
         : property.leaseholderId === payerId ? [id, { ...property, leaseholderId: null, leaseExpiresAtGoPass: null }] : [id, property])) };
     next = addEvent(next, `${payer.name} could not pay the remaining ৳${remaining} and went bankrupt. Assets were transferred under the current bankruptcy rule.`);
-    if (next.players.filter((p) => p.active && p.role === "citizen").length === 0) {
+    if (payer.role === "politician") {
+      next = { ...next, phase: "game-over", winner: "citizens" };
+      next = addEvent(next, "The Politician went bankrupt. The Citizens win this game.");
+    } else if (next.players.filter((p) => p.role === "citizen" && p.bankrupt).length >= 2) {
       next = { ...next, phase: "game-over", winner: "politician" };
-      next = addEvent(next, "All Citizens are bankrupt. The Politician wins.");
+      next = addEvent(next, "Two Citizens are bankrupt. The Politician wins.");
     }
     void beneficiary;
   }
