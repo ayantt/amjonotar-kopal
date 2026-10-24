@@ -111,7 +111,88 @@ function resolveOwnedSpace(state: GameState, player: Player, spaceId: string): G
   }
   return pay(state, player.id, controllerId, rent, `${space.name} rent`);
 }
-function resolveLanding(state: GameState, playerId: string): GameState {
+function applyCardEffect(state: GameState, playerId: string, effect: CardEffect, depth: number): GameState {
+  let next = state;
+  const player = next.players.find((p) => p.id === playerId);
+  if (!player) return next;
+  if (effect.kind === "cash") {
+    if (effect.recipient === "bank") return effect.amount >= 0
+      ? { ...next, players: next.players.map((p) => p.id === playerId ? { ...p, cash: p.cash + effect.amount } : p) } && addEvent({ ...next, players: next.players.map((p) => p.id === playerId ? { ...p, cash: p.cash + effect.amount } : p) }, `${player.name} received ৳${effect.amount} from the card.`, "money")
+      : pay(next, playerId, null, -effect.amount, "card expense");
+    if (effect.recipient === "public") return pay(next, playerId, null, effect.amount, "card payment to public fund");
+    if (effect.recipient === "cooperative") {
+      const paid = Math.min(player.cash, effect.amount);
+      next = { ...next, players: next.players.map((p) => p.id === playerId ? { ...p, cash: p.cash - paid } : p), cooperativeFund: next.cooperativeFund + paid };
+      next = addEvent(next, `${player.name} contributed ৳${paid} to the Citizens' cooperative fund.`, "money");
+      if (paid < effect.amount) next = addEvent(next, `The cooperative contribution was short by ৳${effect.amount-paid}; the shortfall was waived.`);
+      return next;
+    }
+    if (effect.recipient === "public-if-available") {
+      const amount = Math.min(next.publicFund, effect.amount);
+      next = { ...next, publicFund: next.publicFund - amount, players: next.players.map((p) => p.id === playerId ? { ...p, cash: p.cash + amount } : p) };
+      next = addEvent(next, `${player.name} collected ৳${amount} from the public fund; any unavailable balance was waived.`, "money");
+      return next;
+    }
+    for (const citizen of next.players.filter((p) => p.role === "citizen" && p.active && p.id !== playerId)) {
+      next = pay(next, citizen.id, playerId, effect.amount, "card collection");
+    }
+    return next;
+  }
+  if (effect.kind === "contribute") {
+    if (effect.optional && player.controller === "human") return addEvent(next, `${player.name} kept their cash; the optional card contribution was skipped.`);
+    if (player.cash < effect.amount) return addEvent(next, `${player.name} could not afford the optional ৳${effect.amount} contribution; it was skipped.`);
+    next = { ...next, players: next.players.map((p) => p.id === playerId ? { ...p, cash: p.cash - effect.amount } : p),
+      publicFund: effect.destination === "public" ? next.publicFund + effect.amount : next.publicFund,
+      cooperativeFund: effect.destination === "cooperative" ? next.cooperativeFund + effect.amount : next.cooperativeFund };
+    return addEvent(next, `${player.name} contributed ৳${effect.amount} to the ${effect.destination === "public" ? "public fund" : "Citizens' cooperative fund"}.`, "money");
+  }
+  if (effect.kind === "collect-if-citizen-contributes") {
+    const other = next.players.find((p) => p.role === "citizen" && p.id !== playerId && p.active && p.cash >= effect.contribution);
+    if (!other) return addEvent(next, `${player.name} received no neighbour contribution; no payment was made.`);
+    next = { ...next, players: next.players.map((p) => p.id === other.id ? { ...p, cash: p.cash - effect.contribution } : p).map((p) => p.id === playerId ? { ...p, cash: p.cash + effect.amount } : p) };
+    return addEvent(next, `${other.name} contributed ৳${effect.contribution}; ${player.name} received ৳${effect.amount}.`, "money");
+  }
+  if (effect.kind === "skip-turn") {
+    next = { ...next, players: next.players.map((p) => p.id === playerId ? { ...p, skipTurns: p.skipTurns + 1 } : p) };
+    return addEvent(next, `${player.name} must skip their next turn.`);
+  }
+  if (effect.kind === "extra-roll") {
+    next = { ...next, extraRollAvailable: true };
+    return addEvent(next, `${player.name} earned one extra roll after this turn.`);
+  }
+  if (effect.kind === "jail") {
+    next = { ...next, players: next.players.map((p) => p.id === playerId ? { ...p, position: 10, skipTurns: p.skipTurns + 1 } : p) };
+    return addEvent(next, `${player.name} was sent to Administrative Hold and will skip their next turn.`);
+  }
+  if (effect.kind === "move") {
+    const oldPosition = player.position;
+    const raw = oldPosition + effect.steps;
+    const wrapped = raw < 0 ? ((raw % BOARD_SPACE_COUNT) + BOARD_SPACE_COUNT) % BOARD_SPACE_COUNT : raw % BOARD_SPACE_COUNT;
+    const crossed = effect.steps > 0 ? Math.floor(raw / BOARD_SPACE_COUNT) : 0;
+    const reward = player.role === "politician" ? GAME_RULES.politicianGoReward : GAME_RULES.citizenGoReward;
+    next = { ...next, players: next.players.map((p) => p.id === playerId ? { ...p, position: wrapped, cash: p.cash + crossed * reward, goPasses: p.goPasses + crossed } : p) };
+    next = addEvent(next, `${player.name} moved ${effect.steps > 0 ? "forward" : "back"} to ${BOARD[wrapped].name} because of a card.`, "movement");
+    if (crossed > 0) next = addEvent(next, `${player.name} collected ৳${crossed * reward} for passing Shurur Line.`, "money");
+    if (effect.resolveDestination && depth < 2) next = resolveLanding(next, playerId, depth + 1);
+    return next;
+  }
+  return next;
+}
+function resolveCard(state: GameState, playerId: string, deck: "community" | "chance", depth: number): GameState {
+  if (depth > 3) return addEvent(state, "Card movement limit reached; further chained card draws were stopped.");
+  const player = state.players.find((p) => p.id === playerId);
+  if (!player) return state;
+  const index = state.cardDrawCounts[deck];
+  const card = drawCard(deck, player.role, index);
+  let next: GameState = { ...state, cardDrawCounts: { ...state.cardDrawCounts, [deck]: index + 1 } };
+  next = addEvent(next, `${player.name} drew ${card.id}: ${card.title}.`);
+  for (const effect of card.effects[player.role]) {
+    next = applyCardEffect(next, playerId, effect, depth);
+    if (next.phase === "game-over" || next.players.find((p) => p.id === playerId)?.bankrupt) break;
+  }
+  return next;
+}
+function resolveLanding(state: GameState, playerId: string, depth = 0): GameState {
   const player = state.players.find((p) => p.id === playerId);
   if (!player) return state;
   const space = BOARD[player.position];
@@ -139,7 +220,7 @@ function resolveLanding(state: GameState, playerId: string): GameState {
     next = { ...next, players: next.players.map((p) => p.id === player.id ? { ...p, position: 10 } : p) };
     return addEvent(next, `${player.name} was sent to Administrative Hold.`);
   }
-  if (space.type === "community" || space.type === "chance") return addEvent(next, `${player.name} drew from ${space.type === "community" ? "Public Notice" : "the headlines"}; card effects are coming in the next milestone.`);
+  if (space.type === "community" || space.type === "chance") return resolveCard(next, player.id, space.type === "community" ? "community" : "chance", depth);
   if (space.type === "jail") return addEvent(next, `${player.name} is just visiting Administrative Hold.`);
   return next;
 }
