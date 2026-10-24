@@ -217,7 +217,7 @@ export function App() {
             <div className="property-detail"><span>LISTED PRICE</span><strong>{selectedSpace.price !== undefined ? money(selectedSpace.price) : "—"}</strong></div>
             <div className="property-detail"><span>BASE RENT</span><strong>{selectedSpace.type === "utility" ? "Variable" : selectedSpace.price !== undefined ? money(getBaseRent(selectedSpace.id)) : "—"}</strong></div>
             <div className="property-detail"><span>OWNER</span><strong>{game.cooperativePropertyIds.includes(selectedSpace.id) ? "Citizens' Cooperative" : selectedOwner?.name ?? "Unclaimed"}</strong></div>
-            <div className="property-detail"><span>LEASEHOLDER</span><strong>{selectedLeaseholder ? (selectedLeaseholder.role === "politician" ? "Leader's Icon" : selectedLeaseholder.name) : "None"}</strong></div>
+            <div className="property-detail"><span>LEASEHOLDER</span><strong>{selectedLeaseholder ? (selectedLeaseholder.name) : "None"}</strong></div>
           </div>
           <div className="property-detail-status"><span>STATUS</span><strong>{selectedProperty?.mortgaged ? "Mortgaged — no rent collected" : game.cooperativePropertyIds.includes(selectedSpace.id) ? "Shared cooperative property" : selectedOwner ? "Owned" : selectedLeaseholder ? "Leased" : "Available to purchase or lease"}</strong></div>
           <p className="property-detail-note">{selectedSpace.type === "utility"
