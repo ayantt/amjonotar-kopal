@@ -269,7 +269,6 @@ export function App() {
             setGame((state) => state ? mortgageProperty(state, current.id, selectedSpace.id) : state);
             setSelectedPropertyId(null);
           }}>MORTGAGE PROPERTY <span>+{money(getMortgageTerms(current.role, selectedSpace.price).netAdvance)}</span></button>}
-          <button className="primary-action" onClick={() => setSelectedPropertyId(null)}>RETURN TO BOARD <span>×</span></button>
         </div></footer>
       </section>
     </div>}
