@@ -37,7 +37,9 @@ describe("dice and movement", () => {
   it("pays role-specific GO rewards when passing GO", () => {
     const state = createNewGame({ humanRole: "politician" });
     const nearEnd = { ...state, players: state.players.map((player, i) => i === 0 ? { ...player, position: 38 } : player) };
-    const moved = movePlayer(nearEnd, "player-1", 4);
+    // 38 + 3 lands on Purono Dhaka (a property, not a card), so only the GO reward applies.
+    const moved = movePlayer(nearEnd, "player-1", 3);
+    expect(moved.players[0].position).toBe(1);
     expect(moved.players[0].cash).toBe(2_400);
   });
   it("pays the GO pass reward and exact-landing bonus when landing exactly on GO", () => {
@@ -143,7 +145,23 @@ describe("card effects and debt resolution", () => {
     expect(state.events.some((event) => event.message.includes("went bankrupt"))).toBe(true);
   });
 
-  it("automatically mortgages owned property before bankruptcy", () => {
+  it("automatically mortgages owned property before a Citizen goes bankrupt", () => {
+    let state = createNewGame({ humanRole: "citizen" });
+    state = {
+      ...state,
+      currentPlayerIndex: 1,
+      properties: { ...state.properties, "old-dhaka": { ...state.properties["old-dhaka"], ownerId: "player-2" } },
+      players: state.players.map((player, index) => index === 1 ? { ...player, position: 3, cash: 0 } : player),
+    };
+    // Income Tax (৳100) exceeds the ৳29 net advance on a ৳60 property, so the Citizen cannot cover it.
+    state = movePlayer(state, "player-2", 1);
+    expect(state.events.some((event) => event.message.includes("mortgaged Purono Dhaka"))).toBe(true);
+    expect(state.players[1].bankrupt).toBe(true);
+    expect(state.properties["old-dhaka"].ownerId).toBe("player-1");
+    expect(state.players.every((player) => player.cash >= 0)).toBe(true);
+  });
+
+  it("lets the Politician cover a small bill with a full-price mortgage and stay solvent", () => {
     let state = createNewGame({ humanRole: "politician" });
     state = movePlayer(state, "player-1", 1);
     state = resolvePropertyAction(state, "buy");
@@ -153,10 +171,13 @@ describe("card effects and debt resolution", () => {
       currentPlayerIndex: 0,
       players: state.players.map((player, index) => index === 0 ? { ...player, position: 3, cash: 0 } : player),
     };
+    // Income Tax is ৳50 for the Politician; the ৳60 full-price advance covers it, leaving ৳10.
     state = movePlayer(state, "player-1", 1);
     expect(state.events.some((event) => event.message.includes("mortgaged Purono Dhaka"))).toBe(true);
-    expect(state.players[0].bankrupt).toBe(true);
-    expect(state.players.every((player) => player.cash >= 0)).toBe(true);
+    expect(state.properties["old-dhaka"].mortgaged).toBe(true);
+    expect(state.players[0].bankrupt).toBe(false);
+    expect(state.players[0].cash).toBe(10);
+    expect(state.publicFund).toBe(50);
   });
 });
 

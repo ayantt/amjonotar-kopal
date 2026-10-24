@@ -22,12 +22,17 @@ Track unresolved conflicts here. When resolving one, update the rulebook/catalog
 - **RD-102 Leases in Citizen property count:** Provisional: only owned and cooperative properties count, not leased property.
 - **RD-103 Public fund shortfall — resolved for Phase 3:** “If available” collections transfer only the available balance; shortfalls are waived, not carried as hidden liabilities. Revisit if explicit debt instruments are added.
 - **RD-104 Lease rent:** Provisional: active leaseholder alone collects rent; owner does not also collect.
-- **RD-105 Debt order — provisional implementation:** The engine automatically spends cash, mortgages owned unmortgaged properties at half purchase price, then declares bankruptcy if the amount remains unpaid. Player-selected liquidation, cooperative rescue, and mortgage redemption are deferred.
+- **RD-105 Debt order — provisional implementation:** The engine automatically spends cash, then mortgages owned unmortgaged properties using the role-specific loan terms (Citizen: half price less 5% fee; Politician: full price, no fee), then declares bankruptcy if the amount remains unpaid. Manual mortgage redemption is implemented; player-selected liquidation and cooperative rescue are deferred.
 - **RD-106 Cooperative vote:** Majority of active Citizens; Citizen victory still requires all three active.
-- **RD-107 Doubles:** Extra roll after resolving landing, maximum two consecutive bonus rolls.
+- **RD-107 Doubles:** Extra roll after resolving landing, maximum two consecutive bonus rolls. **Status: not implemented in code** (the Constitution now says so); extra rolls currently come only from the Public Holiday card. Implementing it would further favour the Politician, so decide together with balance tuning.
 - **RD-108 Luxury tax contribution:** Politician receives 25% only from available public fund; no money created silently.
 - **RD-109 Maintenance:** ৳50 per house and provisional ৳200 per hotel each time player passes GO.
 - **RD-110 Multi-player card payment failure — resolved for Phase 3:** Process Citizens in player-array order; each transfer invokes the same cash/mortgage/bankruptcy resolver before continuing.
+
+- **RD-121 Buildings on ownership change (partly resolved):** Buildings are demolished when the Politician sells a property back to the government (it becomes unowned land). **Still open:** buildings currently survive a Citizen-to-Politician sale and a Citizen bankruptcy transfer (the Politician inherits them and pays no maintenance). Bankruptcy transfer also clears the mortgage flag for free. Decide whether transferred buildings should be demolished and whether inherited mortgages should survive.
+- **RD-122 Politician bankruptcy conflict (open):** The rulebook's "Debt and bankruptcy" section says the Politician cannot go bankrupt from ordinary debt (government support covers it), but the implemented rule and RD-114 end the game in a Citizen victory when the Politician goes bankrupt. Pick one.
+- **RD-123 Politician wealth and mortgages (open balance risk):** The ৳8,000 wealth test counts the full listed value of owned property even when mortgaged, while the Politician receives the full price in cash when mortgaging. Mortgaging therefore counts the same value twice toward the wealth victory.
+- **RD-124 Community Service (resolved):** CH-11 is "contribute ৳100 to the public fund or lose the next turn"; the turn is lost only when the contribution is declined or unaffordable.
 
 Never silently invent behavior for unresolved rules. Mark decision resolved, record rationale, update docs, and add normal/edge-case tests.
 

@@ -49,12 +49,13 @@ export function runAiTurn(state: GameState, random: RandomSource = Math.random):
       next = resolvePropertyAction(next, action);
     }
   }
-  if (player.role === "citizen" && !player.bankrupt && next.phase !== "game-over") {
-    const currentCitizen = next.players.find((p) => p.id === player.id);
-    if (currentCitizen && currentCitizen.cash >= 1_200 && next.cooperativeFund < 1_000 && next.charterPendingRound === null) {
-      next = contributeToCooperative(next, player.id, Math.min(100, currentCitizen.cash - 1_000));
+  // Re-read the actor after the roll: the pre-roll snapshot cannot know about a bankruptcy caused by this very move.
+  const actor = next.players.find((p) => p.id === player.id);
+  if (actor && actor.role === "citizen" && actor.active && !actor.bankrupt && next.phase !== "game-over") {
+    if (actor.cash >= 1_200 && next.cooperativeFund < 1_000 && next.charterPendingRound === null) {
+      next = contributeToCooperative(next, player.id, Math.min(100, actor.cash - 1_000));
     }
-    if (next.cooperativeFund >= 1_000 && next.charterPendingRound === null && !next.charterActivated && !next.charterVotes.includes(player.id)) {
+    if (next.phase !== "game-over" && next.cooperativeFund >= 1_000 && next.charterPendingRound === null && !next.charterActivated && !next.charterVotes.includes(player.id)) {
       next = voteForCharter(next, player.id);
     }
   }

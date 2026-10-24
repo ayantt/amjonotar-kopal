@@ -38,7 +38,7 @@ Each card has stable ID, title, text, and typed effects. Every transfer names pa
 | CH-08 | Permit Required | Pay ৳80 | Pay ৳10 |
 | CH-09 | Transport Strike | Pay ৳100 compensation | Collect ৳100 compensation |
 | CH-10 | Favourable Headline | Pay ৳50 PR fee | Collect ৳150 from public fund if available |
-| CH-11 | Community Service | Contribute ৳100 or lose next turn | Collect ৳100 allowance |
+| CH-11 | Community Service | Contribute ৳100 (to the public fund) or lose next turn; the turn is lost only if the contribution is declined/unaffordable (human: automatic skip, RD-112) | Collect ৳100 allowance |
 | CH-12 | Court Date | Go to jail | Pay ৳25 and remain free unless investigated |
 | CH-13 | Contract Award | Pay ৳100 bid fee | Collect ৳300 contract income |
 | CH-14 | Inflation Adjustment | Pay ৳120 | Collect ৳120 adjustment |

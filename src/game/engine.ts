@@ -90,8 +90,9 @@ export function rollDice(count: number, random: () => number = defaultRandom): n
   });
 }
 export function getDiceCount(player: Player): number { return player.role === "politician" ? GAME_RULES.politicianDiceCount : GAME_RULES.citizenDiceCount; }
-function pay(state: GameState, payerId: string, recipientId: string | null, amount: number, reason: string): GameState {
-  if (amount <= 0) return state;
+/** Moves money from a player to another player, the public treasury, or (toCooperative) the cooperative fund. */
+function pay(state: GameState, payerId: string, recipientId: string | null, amount: number, reason: string, toCooperative = false): GameState {
+  if (amount <= 0 || state.phase === "game-over") return state;
   const payer = state.players.find((p) => p.id === payerId);
   if (!payer || payer.bankrupt) return state;
   let next = state;
@@ -108,9 +109,7 @@ function pay(state: GameState, payerId: string, recipientId: string | null, amou
       if (remaining <= 0) break;
       const space = BOARD.find((s) => s.id === asset.spaceId);
       const price = space?.price ?? 0;
-      const gross = payer.role === "politician" ? price : Math.floor(price / 2);
-      const fee = payer.role === "politician" ? 0 : Math.floor(gross * 0.05);
-      const proceeds = Math.max(0, gross - fee);
+      const { processingFee: fee, netAdvance: proceeds } = getMortgageTerms(payer.role, price);
       if (proceeds <= 0) continue;
       next = { ...next, properties: { ...next.properties, [asset.spaceId]: { ...asset, mortgaged: true } },
         players: next.players.map((p) => p.id === payerId ? { ...p, cash: p.cash + proceeds } : p),
@@ -123,6 +122,7 @@ function pay(state: GameState, payerId: string, recipientId: string | null, amou
   }
   const paid = amount - remaining;
   if (recipientId) next = { ...next, players: next.players.map((p) => p.id === recipientId ? { ...p, cash: p.cash + paid } : p) };
+  else if (toCooperative) next = { ...next, cooperativeFund: next.cooperativeFund + paid };
   else next = { ...next, publicFund: next.publicFund + paid };
   next = addEvent(next, `${payer.name} paid ৳${paid} of ৳${amount} for ${reason}.`, "money");
   if (remaining > 0) {
@@ -153,11 +153,7 @@ function resolveOwnedSpace(state: GameState, player: Player, spaceId: string): G
     if (space?.type === "railroad") rent = 50 * Math.max(1, state.cooperativePropertyIds.filter((id) => BOARD.find((s) => s.id === id)?.type === "railroad").length);
     if (space?.type === "utility") rent = Math.max(1, player.lastRoll.reduce((sum, n) => sum + n, 0)) * 4;
     if (player.role === "politician") rent = Math.ceil(rent / 2);
-    const before = state.publicFund;
-    let next = pay(state, player.id, null, rent, (space?.name ?? spaceId) + " cooperative rent");
-    const paidIntoPublic = Math.max(0, next.publicFund - before);
-    if (paidIntoPublic > 0) next = { ...next, publicFund: next.publicFund - paidIntoPublic, cooperativeFund: next.cooperativeFund + paidIntoPublic };
-    return next;
+    return pay(state, player.id, null, rent, (space?.name ?? spaceId) + " cooperative rent", true);
   }
   const property = state.properties[spaceId];
   const space = BOARD.find((s) => s.id === spaceId);
@@ -221,8 +217,13 @@ function applyCardEffect(state: GameState, playerId: string, effect: CardEffect,
     return next;
   }
   if (effect.kind === "contribute") {
-    if (effect.optional && player.controller === "human") return addEvent(next, `${player.name} kept their cash; the optional card contribution was skipped.`);
-    if (player.cash < effect.amount) return addEvent(next, `${player.name} could not afford the optional ৳${effect.amount} contribution; it was skipped.`);
+    // "Contribute or lose next turn" cards: declining (or being unable) means the turn is lost instead.
+    const declined = (message: string): GameState => {
+      const logged = addEvent(next, message);
+      return effect.otherwiseSkip ? applyCardEffect(logged, playerId, { kind: "skip-turn" }, depth) : logged;
+    };
+    if (effect.optional && player.controller === "human") return declined(`${player.name} kept their cash; the optional card contribution was skipped.`);
+    if (player.cash < effect.amount) return declined(`${player.name} could not afford the optional ৳${effect.amount} contribution; it was skipped.`);
     next = { ...next, players: next.players.map((p) => p.id === playerId ? { ...p, cash: p.cash - effect.amount } : p),
       publicFund: effect.destination === "public" ? next.publicFund + effect.amount : next.publicFund,
       cooperativeFund: effect.destination === "cooperative" ? next.cooperativeFund + effect.amount : next.cooperativeFund };
@@ -423,12 +424,13 @@ export interface MortgageTerms {
 }
 export function getMortgageTerms(role: Player["role"], price: number): MortgageTerms {
   const grossAdvance = role === "politician" ? price : Math.floor(price / 2);
-  const processingFee = role === "politician" ? 0 : Math.floor(grossAdvance * 0.05);
+  // Integer arithmetic only: floating-point 1.1 / 0.05 multipliers misround (e.g. 50 * 1.1 = 55.00000000000001).
+  const processingFee = role === "politician" ? 0 : Math.floor((grossAdvance * 5) / 100);
   return {
     grossAdvance,
     processingFee,
     netAdvance: grossAdvance - processingFee,
-    redemptionAmount: Math.ceil(grossAdvance * (role === "politician" ? 1.08 : 1.1)),
+    redemptionAmount: Math.ceil((grossAdvance * (role === "politician" ? 108 : 110)) / 100),
   };
 }
 export function mortgageProperty(state: GameState, playerId: string, spaceId: string): GameState {
@@ -492,7 +494,7 @@ export function sellProperty(state: GameState, sellerId: string, spaceId: string
     if (!politician || politician.bankrupt || politician.cash < price) {
       throw new Error("The Politician does not have enough cash to buy this property.");
     }
-    const tax = Math.floor(price * 0.1);
+    const tax = Math.floor(price / 10);
     const proceeds = price - tax;
     let next: GameState = {
       ...state,
@@ -509,9 +511,10 @@ export function sellProperty(state: GameState, sellerId: string, spaceId: string
     ...state,
     players: state.players.map((player) => player.id === sellerId ? { ...player, cash: player.cash + price } : player),
     publicFund: state.publicFund - price,
-    properties: { ...state.properties, [spaceId]: { ...property, ownerId: null, mortgaged: false } },
+    // Land returned to the market is cleared of buildings so the next buyer does not receive free development.
+    properties: { ...state.properties, [spaceId]: { ...property, ownerId: null, mortgaged: false, houses: 0, hotel: false } },
   };
-  return checkVictory(addEvent(next, `${seller.name} sold ${space.name} back to the government for ৳${price}; no sales tax was charged. The property is now unowned.`, "money"));
+  return checkVictory(addEvent(next, `${seller.name} sold ${space.name} back to the government for ৳${price}; no sales tax was charged. The property is now unowned and any buildings were demolished.`, "money"));
 }
 export function endTurn(state: GameState): GameState {
   if (state.phase !== "awaiting-end-turn") throw new Error("Roll and resolve movement before ending the turn.");
