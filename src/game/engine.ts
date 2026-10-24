@@ -43,7 +43,8 @@ export function contributeToCooperative(state: GameState, playerId: string, amou
   if (!Number.isInteger(amount) || amount <= 0 || player.cash < amount) throw new Error("Contribution must be positive and affordable.");
   const next = { ...state, cooperativeFund: state.cooperativeFund + amount,
     players: state.players.map((p) => p.id === playerId ? { ...p, cash: p.cash - amount } : p) };
-  return addEvent(next, `${player.name} contributed ৳${amount} to the Citizens' cooperative fund.`, "money");
+  next = addEvent(next, `${player.name} contributed ৳${amount} to the Citizens' cooperative fund.`, "money");
+  return checkVictory(next);
 }
 export function voteForCharter(state: GameState, playerId: string): GameState {
   const player = state.players.find((p) => p.id === playerId);
@@ -58,7 +59,7 @@ export function voteForCharter(state: GameState, playerId: string): GameState {
   } else if (votes.length >= majority) {
     next = addEvent(next, "The vote passed, but the cooperative fund must reach ৳1,000 before the Charter can be proposed.");
   }
-  return next;
+  return checkVictory(next);
 }
 export function buyCooperativeProperty(state: GameState, playerId: string): GameState {
   const player = state.players.find((p) => p.id === playerId);
@@ -495,8 +496,10 @@ export function endTurn(state: GameState): GameState {
   }
   const politician = next.players.find((p) => p.role === "politician");
   const citizensAlive = next.players.some((p) => p.role === "citizen" && p.active && !p.bankrupt);
-  if (politician && !citizensAlive) return { ...next, phase: "game-over", winner: "politician" };
-  return next;
+  if (politician && !citizensAlive) {
+    return addEvent({ ...next, phase: "game-over", winner: "politician", pendingPropertyId: null }, "No Citizens remain active. The Politician wins.");
+  }
+  return checkVictory(next);
 }
 export function getCurrentPlayer(state: GameState): Player { return state.players[state.currentPlayerIndex]; }
 export function isHumanTurn(state: GameState): boolean {
