@@ -1,27 +1,28 @@
 # Roadmap
 
-## Phase 0 — Foundation (current)
+## Phase 0 — Foundation
 - [x] Product constraints, initial rules, architecture, AI instructions.
+- [x] Define single-human versus three-AI match model.
 - [ ] Resolve open decisions and reconcile rules/cards.
-- [ ] Finalize 40-space board data and balance values.
-Exit: docs agree and clean checkout builds.
+- [x] Define 40 fictional Bangladesh-inspired board spaces.
 
 ## Phase 1 — Playable board and human seat
-- [ ] Role selection: human chooses Politician or Citizen.
-- [ ] Assign exactly three AI-controlled seats; always one Politician and three Citizens total.
-- [ ] Data-driven 40-space fictional board, four tokens and cash balances.
-- [ ] Role-specific dice, movement, GO rewards, turn sequencing.
-- [ ] Human action panel, AI turn status, readable event log, restart.
-- [ ] Engine and setup tests, including role/controller combinations.
-Exit: user plays full rounds against three automatic opponents without manual state repair.
+- [x] Role selection: human chooses Politician or Citizen.
+- [x] Assign exactly three AI-controlled seats; preserve one Politician and three Citizens total.
+- [x] Data-driven 40-space board, four tokens and starting cash.
+- [x] Role-specific dice, movement, GO rewards, turn sequencing.
+- [x] Human roll/end-turn controls, automatic AI turns, event log, restart.
+- [x] Deterministic engine tests for setup, movement, GO rewards, dice, and turn order.
+- [ ] Run install, typecheck, tests, and production build in a Node environment.
+Exit: a user can play successive rounds against three automatic opponents without manual state repair.
 
-## Phase 2 — Property loop and baseline AI
-- [ ] Purchase/lease, ownership, rent, railroad, utilities, tax, special spaces.
+## Phase 2 — Property loop and strategic AI
+- [ ] Purchase/lease, ownership, rent, railroad, utilities, tax, and destination effects.
 - [ ] Legal-action API consumed by both human UI and AI.
-- [ ] Baseline Politician strategy and Citizen strategy.
+- [ ] Baseline Politician and Citizen strategies based on legal actions.
 - [ ] AI choices are validated, logged, bounded, and use no hidden information.
 - [ ] Tests for illegal-action fallback and completed AI turns.
-Exit: several laps can be played with all AI turns resolving reliably.
+Exit: several laps can be played with all AI turns resolving reliably and property decisions available.
 
 ## Phase 3 — Cards and funds
 - [ ] Typed card resolver, 32 cards, shuffling/discard.
