@@ -342,6 +342,7 @@ export function movePlayer(state: GameState, playerId: string, steps: number): G
     }
     if (developed.length > 0) next = addEvent(next, player.name + " paid building maintenance for passing Shurur Line.", "money");
   }
+  if (next.phase === "game-over" || next.players[index]?.bankrupt) return checkVictory(next);
   next = resolveLanding(next, player.id);
   return checkVictory(next);
 }
