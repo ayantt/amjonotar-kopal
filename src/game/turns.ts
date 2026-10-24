@@ -39,7 +39,7 @@ export function runAiTurn(state: GameState, random: RandomSource = Math.random):
         ? "bought the property while keeping a cash reserve."
         : "declined the property to preserve available cash.";
     next = { ...next, nextEventId: next.nextEventId + 1, events: [...next.events, {
-      id: next.nextEventId, kind: "ai", message: player.name + " " + rationale,
+      id: next.nextEventId, kind: "ai" as const, message: player.name + " " + rationale,
     }].slice(-100) };
     next = resolvePropertyAction(next, action);
   }
