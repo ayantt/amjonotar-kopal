@@ -204,3 +204,7 @@
  .game-shell:fullscreen{padding:.25rem}
  .game-shell:fullscreen .game-layout>.sidebar{grid-template-columns:minmax(0,1fr)}
 }
+
+
+/* Keep the immersive fullscreen view focused on the board and play controls. */
+.game-shell:fullscreen .game-intro{display:none}
