@@ -150,12 +150,12 @@ describe("card effects and debt resolution", () => {
     state = {
       ...state,
       phase: "awaiting-roll",
-      currentPlayerIndex: 1,
-      players: state.players.map((player, index) => index === 0 ? { ...player, cash: 0 } : index === 1 ? { ...player, position: 3, cash: 0 } : player),
+      currentPlayerIndex: 0,
+      players: state.players.map((player, index) => index === 0 ? { ...player, position: 3, cash: 0 } : player),
     };
-    state = movePlayer(state, "player-2", 1);
+    state = movePlayer(state, "player-1", 1);
     expect(state.properties["old-dhaka"].mortgaged).toBe(true);
-    expect(state.players[1].bankrupt).toBe(true);
+    expect(state.players[0].bankrupt).toBe(true);
     expect(state.players.every((player) => player.cash >= 0)).toBe(true);
   });
 });
