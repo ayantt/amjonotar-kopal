@@ -22,6 +22,13 @@ Buy an unowned property at listed price or decline; no auction in MVP. A Citizen
 
 Citizen on another Citizen's property pays normal development-adjusted rent. Citizen on Politician-controlled property pays the applicable rent; Politician lease rent is half base rent unless a specific rule overrides it. Politician landing on Citizen property pays half normal rent. Own property costs no rent. Cooperative-property rent goes to cooperative fund; cooperative-property rules are distinct from individual ownership.
 
+## Property sales
+
+- A human player may sell an individually owned property during their own turn from the property's detail popup. Properties with an active lease and Citizens' Cooperative properties cannot be sold through this action.
+- When a Citizen sells, the Politician must have enough available cash to pay the property's full listed price. The Politician buys the property automatically; the seller receives 90% of the listed price and 10% is paid to the public treasury as sales tax.
+- When the Politician sells, the government buys the property back at its full listed price. The Politician receives the full amount and pays no sales tax. The property becomes unowned and returns to the market. The government treasury is allowed to go negative for this buy-back; player cash is never allowed to go negative.
+- Sales are recorded in the Official Record and are resolved by the game engine.
+
 ## Implemented property-loop details (current code)
 
 - Unclaimed land, railroads, and utilities pause the turn for Buy, Lease, or Decline. The engine exposes only affordable actions; the same legal-action list drives the human panel and AI.
