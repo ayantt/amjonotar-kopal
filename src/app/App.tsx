@@ -111,7 +111,7 @@ export function App() {
                   ? { gridColumn: index - 19, gridRow: 1 }
                   : { gridColumn: 11, gridRow: index - 29 };
             return <div style={edge} className={`space space-${space.type} ${space.color ? `color-${space.color}` : ""}`} key={space.id}>
-              <span className="space-index">{String(index).padStart(2, "0")}</span><strong>{space.name}</strong><small>{space.subtitle}</small>
+              <strong>{space.name}</strong>
               {space.price !== undefined && <span className="space-price">{money(space.price)}</span>}
               {game.cooperativePropertyIds.includes(space.id) && <small className="ownership-tag">OWN: CITIZENS CO-OP</small>}{game.properties[space.id]?.ownerId && <small className="ownership-tag">OWN: {game.players.find((player) => player.id === game.properties[space.id].ownerId)?.name ?? "Unknown"}</small>}
               {game.properties[space.id]?.leaseholderId && <small className="ownership-tag">LEASE: {game.players.find((player) => player.id === game.properties[space.id].leaseholderId)?.name ?? "Unknown"}</small>}
