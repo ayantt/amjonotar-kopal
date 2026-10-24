@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { BOARD } from "../game/board";
-import { buyCooperativeProperty, contributeToCooperative, createNewGame, endTurn, getCurrentPlayer, isHumanTurn, resolvePropertyAction, rollAndMove, validateSetup, voteForCharter } from "../game/engine";
+import { buyCooperativeProperty, contributeToCooperative, createNewGame, endTurn, getCurrentPlayer, isHumanTurn, resolvePropertyAction, rollAndMove, sellProperty, validateSetup, voteForCharter } from "../game/engine";
 import { runAiTurn } from "../game/turns";
 import { getBaseRent, getLegalPropertyActions } from "../game/properties";
 import type { GameState, PlayerRole } from "../game/types";
