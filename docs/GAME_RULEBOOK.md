@@ -3,6 +3,8 @@
 Provisional values must be play-tested. If documents conflict, resolve it in RULE_DECISIONS.md before coding.
 
 ## Setup
+Exactly four seats: one human-controlled player and three AI-controlled players. The human chooses Politician or Citizen; fill remaining seats with AI while preserving exactly one Politician and three Citizens. There is no local pass-and-play. AI turns advance automatically and display their actions in the event log.
+
 | Setting | Politician | Each Citizen |
 |---|---:|---:|
 | Starting cash | ৳2,000 | ৳1,500 |
@@ -13,7 +15,7 @@ Provisional values must be play-tested. If documents conflict, resolve it in RUL
 Order: Politician, Citizen 1, Citizen 2, Citizen 3. Public and cooperative funds start at ৳0. Cash cannot be negative; unaffordable payments enter debt resolution.
 
 ## Turns and GO
-Roll, move, reward each GO crossing, resolve destination, complete legal actions, log events, check victory, advance. Politician doubles grant an additional roll after the landing resolves; cap bonus rolls at two consecutive. Citizens roll one die. Moving forward across GO pays reward; backward movement does not unless a card says otherwise.
+Roll, move, reward each GO crossing, resolve destination, complete legal actions, log events, check victory, advance. Human chooses among legal actions. AI chooses one action from the engine's legal-action list; the engine validates it. AI choices use only player-appropriate information, have a bounded decision process, and show a short rationale in the log. Politician doubles grant an additional roll after the landing resolves; cap bonus rolls at two consecutive. Citizens roll one die. Moving forward across GO pays reward; backward movement does not unless a card says otherwise.
 
 ## Properties and leases
 Buy an unowned property at listed price or decline; no auction in MVP. A Citizen may lease for half price (round down), collects full base rent, and lease expires after passing GO five times after signing. Politician may lease for half price, collects half base rent, and lease never expires. During an active lease only the designated leaseholder collects rent; do not double-pay owner and leaseholder.
