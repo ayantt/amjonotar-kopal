@@ -2,12 +2,12 @@
 
 A satirical, Bangladesh-inspired property board game: **The people pay. The powerful play.**
 
-Exactly four local pass-and-play seats: one Politician and three Citizens. The intentionally unequal rules parody patronage, rent-seeking, and public-service failures. Citizens can win only by cooperating.
+A single human plays against three computer-controlled opponents. Each game has exactly four seats: one Politician and three Citizens. The intentionally unequal rules parody patronage, rent-seeking, and public-service failures. Citizens can win only by cooperating, including when their seats are AI-controlled.
 
 > Fictional political satire. Use fictional composites; do not imply allegations about specific real people.
 
 ## Status
-Specification and starter scaffold. Full gameplay is not implemented yet.
+Specification and starter scaffold. Full gameplay and AI opponents are not implemented yet.
 
 ## Docs
 - [Product specification](docs/PRODUCT_SPEC.md)
@@ -20,7 +20,7 @@ Specification and starter scaffold. Full gameplay is not implemented yet.
 - [Claude Code instructions](CLAUDE.md)
 
 ## Stack
-React + TypeScript + Vite; pure TypeScript game engine; Vitest. Local-only MVP: no backend, accounts, or network multiplayer.
+React + TypeScript + Vite; pure TypeScript game engine; Vitest. Client-only MVP: no backend, accounts, or online multiplayer. AI opponents run locally in the browser.
 
 ## Run
 Requires current Node.js LTS and npm.
@@ -31,8 +31,9 @@ npm run dev
 Checks: `npm run typecheck`, `npm test`, `npm run build`.
 
 ## Principles
+- One human player versus three AI opponents.
 - Centralized, data-driven rules.
-- Explicit and logged money transfers.
+- Explicit and logged money transfers and AI decisions.
 - Integer Bangladeshi taka (৳).
 - Cooperative Citizen victory must be viable.
 - Engine owns validation and state transitions.
