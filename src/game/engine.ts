@@ -1,6 +1,6 @@
 import { BOARD, BOARD_SPACE_COUNT } from "./board";
 import { GAME_RULES } from "./rules";
-import { CARD_DECKS, drawCard, type CardEffect } from "./cards";
+import { drawCard, type CardEffect } from "./cards";
 import { countRailroads, createPropertyLedger, getBaseRent, getLegalPropertyActions, isPurchasable, type PropertyAction } from "./properties";
 import type { Controller, GameEvent, GameState, NewGameOptions, Player, PlayerRole } from "./types";
 
@@ -290,9 +290,36 @@ export function resolvePropertyAction(state: GameState, action: PropertyAction):
 export function endTurn(state: GameState): GameState {
   if (state.phase !== "awaiting-end-turn") throw new Error("Roll and resolve movement before ending the turn.");
   if (state.pendingPropertyId) throw new Error("Resolve the property decision before ending the turn.");
-  const nextIndex = (state.currentPlayerIndex + 1) % state.players.length;
-  const round = nextIndex === 0 ? state.round + 1 : state.round;
-  return addEvent({ ...state, phase: "awaiting-roll", currentPlayerIndex: nextIndex, round }, `Round ${round}: ${state.players[nextIndex].name}'s turn.`);
+  if (state.extraRollAvailable && !getCurrentPlayer(state).bankrupt) {
+    const next = { ...state, phase: "awaiting-roll" as const, extraRollAvailable: false };
+    return addEvent(next, `${getCurrentPlayer(next).name} takes the extra roll before passing the turn.`);
+  }
+  let nextIndex = state.currentPlayerIndex;
+  let round = state.round;
+  let nextPlayers = state.players;
+  let next: GameState = { ...state, phase: "awaiting-roll", extraRollAvailable: false };
+  for (let attempts = 0; attempts < state.players.length; attempts += 1) {
+    nextIndex = (nextIndex + 1) % state.players.length;
+    if (nextIndex === 0) round += 1;
+    const candidate = nextPlayers[nextIndex];
+    if (candidate.bankrupt || !candidate.active) {
+      next = { ...next, currentPlayerIndex: nextIndex, round };
+      next = addEvent(next, `${candidate.name} is bankrupt and is skipped.`);
+      continue;
+    }
+    if (candidate.skipTurns > 0) {
+      nextPlayers = nextPlayers.map((p, i) => i === nextIndex ? { ...p, skipTurns: p.skipTurns - 1 } : p);
+      next = { ...next, players: nextPlayers, currentPlayerIndex: nextIndex, round };
+      next = addEvent(next, `${candidate.name} misses this turn due to a card.`);
+      continue;
+    }
+    next = { ...next, players: nextPlayers, currentPlayerIndex: nextIndex, round };
+    return addEvent(next, `Round ${round}: ${next.players[nextIndex].name}'s turn.`);
+  }
+  const politician = next.players.find((p) => p.role === "politician");
+  const citizensAlive = next.players.some((p) => p.role === "citizen" && p.active && !p.bankrupt);
+  if (politician && !citizensAlive) return { ...next, phase: "game-over", winner: "politician" };
+  return next;
 }
 export function getCurrentPlayer(state: GameState): Player { return state.players[state.currentPlayerIndex]; }
 export function isHumanTurn(state: GameState): boolean {
