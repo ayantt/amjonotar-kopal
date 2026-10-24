@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { BOARD } from "../game/board";
 import { buyCooperativeProperty, contributeToCooperative, createNewGame, endTurn, getCurrentPlayer, isHumanTurn, resolvePropertyAction, rollAndMove, validateSetup, voteForCharter } from "../game/engine";
 import { runAiTurn } from "../game/turns";
-import { getLegalPropertyActions } from "../game/properties";
+import { getBaseRent, getLegalPropertyActions } from "../game/properties";
 import type { GameState, PlayerRole } from "../game/types";
 
 const money = (amount: number) => `৳${amount.toLocaleString("en-BD")}`;
@@ -12,6 +12,7 @@ export function App() {
   const [busy, setBusy] = useState(false);
   const [lastAction, setLastAction] = useState("Choose your role to start a new game.");
   const [showConstitution, setShowConstitution] = useState(false);
+  const [selectedPropertyId, setSelectedPropertyId] = useState<string | null>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [eventQueue, setEventQueue] = useState<Array<{ id: number; message: string; kind: string }>>([]);
   const [activeEvent, setActiveEvent] = useState<{ id: number; message: string; kind: string } | null>(null);
@@ -116,11 +117,39 @@ export function App() {
         <button className="role-card citizen-card" onClick={() => startGame("citizen")}><span className="role-number">02 / PEOPLE</span><strong>Play as Citizen</strong><span>One die. Three citizens. Your best chance is to work together.</span><span className="button-copy">JOIN THE PUBLIC ↗</span></button>
       </div>
     </section>
+    {selectedSpace && <div className="property-modal-backdrop" role="presentation" onClick={() => setSelectedPropertyId(null)}>
+      <section className="property-modal" role="dialog" aria-modal="true" aria-labelledby="property-modal-title" onClick={(event) => event.stopPropagation()}>
+        <header className={`property-modal-header ${selectedSpace.color ? `color-${selectedSpace.color}` : ""}`}>
+          <div><span className="property-modal-kicker">PROPERTY REGISTER · {selectedSpace.type.toUpperCase()}</span><h2 id="property-modal-title">{selectedSpace.name}</h2><p>{selectedSpace.subtitle}</p></div>
+          <button className="constitution-close" onClick={() => setSelectedPropertyId(null)} aria-label="Close property details">CLOSE ×</button>
+        </header>
+        <div className="property-modal-body">
+          <div className="property-detail-grid">
+            <div className="property-detail"><span>LISTED PRICE</span><strong>{selectedSpace.price !== undefined ? money(selectedSpace.price) : "—"}</strong></div>
+            <div className="property-detail"><span>BASE RENT</span><strong>{selectedSpace.type === "utility" ? "Variable" : selectedSpace.price !== undefined ? money(getBaseRent(selectedSpace.id)) : "—"}</strong></div>
+            <div className="property-detail"><span>OWNER</span><strong>{game.cooperativePropertyIds.includes(selectedSpace.id) ? "Citizens' Cooperative" : selectedOwner?.name ?? "Unclaimed"}</strong></div>
+            <div className="property-detail"><span>LEASEHOLDER</span><strong>{selectedLeaseholder ? (selectedLeaseholder.role === "politician" ? "Leader's Icon" : selectedLeaseholder.name) : "None"}</strong></div>
+          </div>
+          <div className="property-detail-status"><span>STATUS</span><strong>{selectedProperty?.mortgaged ? "Mortgaged — no rent collected" : game.cooperativePropertyIds.includes(selectedSpace.id) ? "Shared cooperative property" : selectedOwner ? "Owned" : selectedLeaseholder ? "Leased" : "Available to purchase or lease"}</strong></div>
+          <p className="property-detail-note">{selectedSpace.type === "utility"
+            ? "Utility rent is calculated from the player's dice roll and the applicable role rules."
+            : selectedSpace.type === "railroad"
+              ? "Railroad rent depends on the railroad holdings and applicable role rules."
+              : "Actual rent may differ from base rent depending on the owner's role, lease terms, and any applicable game rules."}</p>
+        </div>
+        <footer className="property-modal-footer"><span>THE REPUBLIC OF OPPORTUNITY · SPACE {BOARD.findIndex((space) => space.id === selectedSpace.id)}</span><button className="primary-action" onClick={() => setSelectedPropertyId(null)}>RETURN TO BOARD <span>×</span></button></footer>
+      </section>
+    </div>}
     <footer className="site-footer"><span>FICTIONAL POLITICAL SATIRE</span><span>4 SEATS · 1 HUMAN · 3 AI</span></footer>
   </main>;
 
   const current = getCurrentPlayer(game);
   const propertyActions = game.pendingPropertyId ? getLegalPropertyActions(game, current) : [];
+  const selectedSpace = selectedPropertyId ? BOARD.find((space) => space.id === selectedPropertyId) : undefined;
+  const selectedProperty = selectedSpace ? game.properties[selectedSpace.id] : undefined;
+  const selectedOwner = selectedProperty?.ownerId ? game.players.find((player) => player.id === selectedProperty.ownerId) : undefined;
+  const selectedLeaseholder = selectedProperty?.leaseholderId ? game.players.find((player) => player.id === selectedProperty.leaseholderId) : undefined;
+  const isPurchasableSpace = (type: string) => ["property", "railroad", "utility"].includes(type);
   return <main className="game-shell">
     <header className="game-header">
       <button className="wordmark" onClick={restart} aria-label="Return to role selection">আমজনতার কপাল<span>BACK TO MENU ↗</span></button>
@@ -160,7 +189,7 @@ export function App() {
                 : index <= 30
                   ? { gridColumn: index - 19, gridRow: 1 }
                   : { gridColumn: 11, gridRow: index - 29 };
-            return <div style={edge} className={`space space-${space.type} ${space.color ? `color-${space.color}` : ""}`} key={space.id}>
+            return <div style={edge} className={`space space-${space.type} ${space.color ? `color-${space.color}` : ""} ${isPurchasableSpace(space.type) ? "space-clickable" : ""}`} key={space.id} role={isPurchasableSpace(space.type) ? "button" : undefined} tabIndex={isPurchasableSpace(space.type) ? 0 : undefined} aria-label={isPurchasableSpace(space.type) ? `View details for ${space.name}` : undefined} onClick={isPurchasableSpace(space.type) ? () => setSelectedPropertyId(space.id) : undefined} onKeyDown={isPurchasableSpace(space.type) ? (event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); setSelectedPropertyId(space.id); } } : undefined}>
               <strong>{space.name}</strong>
               {space.price !== undefined && <span className="space-price">{money(space.price)}</span>}
               {game.cooperativePropertyIds.includes(space.id) && <small className="ownership-tag">OWN: CITIZENS CO-OP</small>}{game.properties[space.id]?.ownerId && <small className="ownership-tag">OWN: {game.players.find((player) => player.id === game.properties[space.id].ownerId)?.name ?? "Unknown"}</small>}
