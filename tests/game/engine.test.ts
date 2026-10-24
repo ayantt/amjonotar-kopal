@@ -211,7 +211,8 @@ describe("turn-changing card effects", () => {
 
 describe("cooperative economy and victory", () => {
   it("moves a Citizen contribution into the separate cooperative fund", () => {
-    const state = createNewGame({ humanRole: "citizen" });
+    const initial = createNewGame({ humanRole: "citizen" });
+    const state = { ...initial, currentPlayerIndex: 1 };
     const citizen = state.players[1];
     const next = contributeToCooperative(state, citizen.id, 100);
     expect(next.players[1].cash).toBe(citizen.cash - 100);
@@ -221,7 +222,7 @@ describe("cooperative economy and victory", () => {
 
   it("requires a majority and a thousand taka before the Charter is pending", () => {
     let state = createNewGame({ humanRole: "citizen" });
-    state = { ...state, cooperativeFund: 1_000 };
+    state = { ...state, currentPlayerIndex: 1, cooperativeFund: 1_000 };
     state = voteForCharter(state, "player-2");
     expect(state.charterPendingRound).toBeNull();
     state = voteForCharter(state, "player-3");
