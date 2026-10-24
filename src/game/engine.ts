@@ -8,6 +8,32 @@ const defaultRandom = () => Math.random();
 function addEvent(state: GameState, message: string, kind: GameEvent["kind"] = "system"): GameState {
   return { ...state, nextEventId: state.nextEventId + 1, events: [...state.events, { id: state.nextEventId, message, kind }].slice(-100) };
 }
+function activeCitizens(state: GameState): Player[] {
+  return state.players.filter((p) => p.role === "citizen" && p.active && !p.bankrupt);
+}
+function checkVictory(state: GameState, atCitizenRoundStart = false): GameState {
+  if (state.phase === "game-over") return state;
+  const politician = state.players.find((p) => p.role === "politician");
+  if (!politician || politician.bankrupt) return { ...state, phase: "game-over", winner: "citizens" };
+  const citizens = activeCitizens(state);
+  const controls = Object.values(state.properties).filter((p) => p.ownerId === politician.id || p.leaseholderId === politician.id).length;
+  const assetValue = Object.values(state.properties).filter((p) => p.ownerId === politician.id).reduce((sum, p) => sum + (BOARD.find((s) => s.id === p.spaceId)?.price ?? 0), 0);
+  if (state.players.filter((p) => p.role === "citizen" && p.bankrupt).length >= 2) {
+    return addEvent({ ...state, phase: "game-over", winner: "politician" }, "The Politician wins: two Citizens are bankrupt.");
+  }
+  if (controls >= 7 || politician.cash + assetValue >= 8_000) {
+    return addEvent({ ...state, phase: "game-over", winner: "politician" }, controls >= 7 ? "The Politician wins by controlling at least seven properties." : "The Politician wins by reaching ৳8,000 in cash and owned property value.");
+  }
+  if (atCitizenRoundStart && state.charterPendingRound !== null && state.round > state.charterPendingRound) {
+    const controlled = Object.values(state.properties).filter((p) => (p.ownerId !== null && citizens.some((citizen) => citizen.id === p.ownerId)) || state.cooperativePropertyIds.includes(p.spaceId)).length;
+    const combinedCash = citizens.reduce((sum, citizen) => sum + citizen.cash, 0);
+    if (citizens.length === 3 && controlled >= 8 && combinedCash >= 3_000 && state.cooperativeFund >= 1_000 && state.charterVotes.length >= 2) {
+      return addEvent({ ...state, phase: "game-over", winner: "citizens", charterActivated: true }, "The People's Charter held through the next Citizen round. All Citizens win together.");
+    }
+    return addEvent({ ...state, charterPendingRound: null, charterVotes: [] }, "The People's Charter conditions did not hold until the next Citizen round; Citizens may organize again.");
+  }
+  return state;
+}
 function makePlayer(id: string, name: string, role: PlayerRole, controller: Controller): Player {
   return { id, name, role, controller, cash: role === "politician" ? GAME_RULES.politicianStartingCash : GAME_RULES.citizenStartingCash, position: 0, active: true, lastRoll: [], goPasses: 0, bankrupt: false, skipTurns: 0 };
 }
