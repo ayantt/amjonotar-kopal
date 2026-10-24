@@ -49,6 +49,6 @@ card("CH-14","Inflation Adjustment","chance",[cash(-120)],[cash(120)]),
 card("CH-15","Public Apology","chance",[cash(-50)],[cash(-10)]),
 card("CH-16","Collective Action","chance",[contribution(50,"cooperative",true)],[cash(100,"public-payment-if-available")])
 ]};
-export function drawCard(deck:"community"|"chance",role:PlayerRole,index:number):GameCard {
+export function drawCard(deck:"community"|"chance",index:number):GameCard {
  const cards=CARD_DECKS[deck]; return cards[((index%cards.length)+cards.length)%cards.length];
 }
