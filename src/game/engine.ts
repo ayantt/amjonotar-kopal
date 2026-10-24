@@ -147,6 +147,17 @@ function pay(state: GameState, payerId: string, recipientId: string | null, amou
   return next;
 }
 function resolveOwnedSpace(state: GameState, player: Player, spaceId: string): GameState {
+  if (state.cooperativePropertyIds.includes(spaceId)) {
+    const space = BOARD.find((s) => s.id === spaceId);
+    let rent = getBaseRent(spaceId);
+    if (space?.type === "railroad") rent = 50 * Math.max(1, countRailroads(state, "cooperative"));
+    if (player.role === "politician") rent = Math.ceil(rent / 2);
+    const before = state.publicFund;
+    let next = pay(state, player.id, null, rent, (space?.name ?? spaceId) + " cooperative rent");
+    const paidIntoPublic = Math.max(0, next.publicFund - before);
+    if (paidIntoPublic > 0) next = { ...next, publicFund: next.publicFund - paidIntoPublic, cooperativeFund: next.cooperativeFund + paidIntoPublic };
+    return next;
+  }
   const property = state.properties[spaceId];
   const space = BOARD.find((s) => s.id === spaceId);
   if (!property || !space || property.mortgaged) return state;
@@ -266,7 +277,7 @@ function resolveLanding(state: GameState, playerId: string, depth = 0): GameStat
   let next = state;
   if (isPurchasable(space.id)) {
     const property = next.properties[space.id];
-    if (property?.ownerId || property?.leaseholderId) return resolveOwnedSpace(next, player, space.id);
+    if (next.cooperativePropertyIds.includes(space.id) || property?.ownerId || property?.leaseholderId) return resolveOwnedSpace(next, player, space.id);
     next = { ...next, pendingPropertyId: space.id };
     return addEvent(next, `${player.name} found ${space.name} unclaimed. Buy, lease, or decline.`);
   }
@@ -319,7 +330,7 @@ export function movePlayer(state: GameState, playerId: string, steps: number): G
   if (crossedGoCount) next = addEvent(next, `${player.name} collected ৳${reward * crossedGoCount} for passing Shurur Line.`, "money");
   if (exactGo) next = addEvent(next, `${player.name} landed exactly on Shurur Line and received an extra ৳${exactBonus}.`, "money");
   next = resolveLanding(next, player.id);
-  return next;
+  return checkVictory(next);
 }
 export function rollAndMove(state: GameState, random: () => number = defaultRandom): GameState {
   if (state.phase !== "awaiting-roll") throw new Error("The game is not waiting for a roll.");
@@ -352,7 +363,7 @@ export function resolvePropertyAction(state: GameState, action: PropertyAction):
     next = { ...state, pendingPropertyId: null };
     next = addEvent(next, `${player.name} declined ${space.name}.`);
   }
-  return next;
+  return checkVictory(next);
 }
 export function endTurn(state: GameState): GameState {
   if (state.phase !== "awaiting-end-turn") throw new Error("Roll and resolve movement before ending the turn.");
@@ -381,7 +392,8 @@ export function endTurn(state: GameState): GameState {
       continue;
     }
     next = { ...next, players: nextPlayers, currentPlayerIndex: nextIndex, round };
-    return addEvent(next, `Round ${round}: ${next.players[nextIndex].name}'s turn.`);
+    next = addEvent(next, `Round ${round}: ${next.players[nextIndex].name}'s turn.`);
+    return checkVictory(next, next.players[nextIndex].role === "citizen");
   }
   const politician = next.players.find((p) => p.role === "politician");
   const citizensAlive = next.players.some((p) => p.role === "citizen" && p.active && !p.bankrupt);
