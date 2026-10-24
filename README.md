@@ -7,7 +7,7 @@ A single human plays against three computer-controlled opponents. Each game has 
 > Fictional political satire. Use fictional composites; do not imply allegations about specific real people.
 
 ## Status
-**Phase 2 in progress:** role selection, 40-space fictional board, role-based dice, movement and GO rewards; property buy/lease/decline actions; ownership and rent transfers; railroad and utility charges; basic taxes and public-treasury collection; and role-aware AI property decisions. Cards, debt resolution, cooperative strategy, development, and victory mechanics remain future milestones.
+**Playable systems implemented so far:** role selection, 40-space fictional board, role-based dice and GO rewards; property buy/lease/decline; ownership, rent, railroads and utilities; 32 role-specific cards; public/cooperative fund transfers; skipped turns and extra rolls; automatic mortgage fallback and bankruptcy outcomes. The game still needs full playtesting, card-choice UI, shuffled decks, mortgage redemption, housing, cooperative victory mechanics, and stronger AI strategy.
 
 ## Docs
 - [Product specification](docs/PRODUCT_SPEC.md)
