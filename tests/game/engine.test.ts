@@ -154,7 +154,7 @@ describe("card effects and debt resolution", () => {
       players: state.players.map((player, index) => index === 0 ? { ...player, position: 3, cash: 0 } : player),
     };
     state = movePlayer(state, "player-1", 1);
-    expect(state.properties["old-dhaka"].mortgaged).toBe(true);
+    expect(state.events.some((event) => event.message.includes("mortgaged Purono Dhaka"))).toBe(true);
     expect(state.players[0].bankrupt).toBe(true);
     expect(state.players.every((player) => player.cash >= 0)).toBe(true);
   });
