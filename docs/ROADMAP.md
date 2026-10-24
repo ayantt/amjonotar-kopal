@@ -30,11 +30,11 @@ Exit: several laps can be played with all AI turns resolving reliably and proper
 - [x] AI card handling, automatic mortgage fallback, bankruptcy outcomes, and initial card/debt tests.
 
 ## Phase 4 — Cooperation/economy
-- [ ] Contributions, voting, cooperative property.
+- [x] Citizen contributions, Charter voting, cooperative property purchases, and shared-rent transfers.
 - [ ] Housing, mortgage redemption, debt-choice UI, and broader bankruptcy edge-case coverage.
 - [ ] AI Citizens coordinate through explicit shared rules and actions.
-- [ ] Both victory routes and boundary tests.
-- [ ] Simulate balance; tune values.
+- [x] Politician property/wealth/bankruptcy victory and Citizen Charter victory conditions, with initial boundary tests.
+- [ ] Simulate balance; tune values and expand full-game playtesting.
 
 ## Phase 5 — UX/release
 - [ ] Responsive board/property inspector and clear action panel.
