@@ -22,6 +22,15 @@ Buy an unowned property at listed price or decline; no auction in MVP. A Citizen
 
 Citizen on another Citizen's property pays normal development-adjusted rent. Citizen on Politician-controlled property pays the applicable rent; Politician lease rent is half base rent unless a specific rule overrides it. Politician landing on Citizen property pays half normal rent. Own property costs no rent. Cooperative-property rent goes to cooperative fund; cooperative-property rules are distinct from individual ownership.
 
+## Implemented property-loop details (current code)
+
+- Unclaimed land, railroads, and utilities pause the turn for Buy, Lease, or Decline. The engine exposes only affordable actions; the same legal-action list drives the human panel and AI.
+- Land base rent is 10% of purchase price rounded up, with a ৳10 minimum. Railroad base rent is ৳50 multiplied by the number of railroads controlled by its owner/leaseholder. Citizen visitors pay double on Politician-controlled railroads; Politician visitors pay half on Citizen-controlled railroads.
+- Utility charge uses the visitor's roll total: Citizen-controlled utility costs 4× that total; Politician-controlled utility costs 10× plus ৳30. Politician visitors pay no utility charge.
+- Politician visitors pay half rent on Citizen-controlled land. Politician leases collect half land rent. An active leaseholder receives rent instead of the property owner, preventing duplicate payouts. Citizen leases expire after five GO passes; Politician leases are permanent.
+- Income Tax currently charges Citizens ৳100 and the Politician ৳50. Development Levy charges Citizens ৳100 and exempts the Politician. Politician landing on Public Plaza withdraws the available public treasury; other players receive no jackpot.
+- These are initial Phase 2 values. Card effects, cooperative properties, debt/bankruptcy settlement, houses, and victory triggers are not yet active in the engine. If a player cannot pay, the current fallback charges available cash and logs the shortfall; full debt resolution is pending.
+
 ## Housing (later phase)
 Levels: none (1×), 1 house (2×), 2 houses (3×), 3 houses (4×), hotel (6×). Incremental Citizen costs: ৳200, ৳300, ৳400, ৳600. Citizens must own full color group and build evenly. Citizen maintenance: ৳50 per house each GO pass; hotel maintenance provisionally ৳200 per GO pass. Politician may build on owned properties without group completion, pays half upgrade cost, and may upgrade directly to hotel. No building on another player's property; permit-fee idea is deferred.
 
