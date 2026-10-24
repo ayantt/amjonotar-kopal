@@ -118,3 +118,44 @@ describe("property actions and rent", () => {
     expect(state.pendingPropertyId).toBeNull();
   });
 });
+
+describe("card effects and debt resolution", () => {
+  it("resolves the first Community card according to the current role", () => {
+    let state = createNewGame({ humanRole: "politician" });
+    const before = state.players[0].cash;
+    state = movePlayer(state, "player-1", 2);
+    expect(state.cardDrawCounts.community).toBe(1);
+    expect(state.players[0].cash).toBe(before + 250);
+    expect(state.events.some((event) => event.message.includes("CC-01: Government Allowance"))).toBe(true);
+  });
+
+  it("never allows negative cash and declares bankruptcy after available funds are exhausted", () => {
+    let state = createNewGame({ humanRole: "citizen" });
+    state = {
+      ...state,
+      currentPlayerIndex: 1,
+      players: state.players.map((player, index) => index === 1 ? { ...player, position: 3, cash: 5 } : player),
+    };
+    state = movePlayer(state, "player-2", 1);
+    expect(state.players[1].cash).toBe(0);
+    expect(state.players[1].bankrupt).toBe(true);
+    expect(state.players[1].active).toBe(false);
+    expect(state.events.some((event) => event.message.includes("went bankrupt"))).toBe(true);
+  });
+
+  it("automatically mortgages owned property before bankruptcy", () => {
+    let state = createNewGame({ humanRole: "politician" });
+    state = movePlayer(state, "player-1", 1);
+    state = resolvePropertyAction(state, "buy");
+    state = {
+      ...state,
+      phase: "awaiting-roll",
+      currentPlayerIndex: 1,
+      players: state.players.map((player, index) => index === 0 ? { ...player, cash: 0 } : index === 1 ? { ...player, position: 3, cash: 0 } : player),
+    };
+    state = movePlayer(state, "player-2", 1);
+    expect(state.properties["old-dhaka"].mortgaged).toBe(true);
+    expect(state.players[1].bankrupt).toBe(true);
+    expect(state.players.every((player) => player.cash >= 0)).toBe(true);
+  });
+});
