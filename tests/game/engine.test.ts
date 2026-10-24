@@ -179,3 +179,32 @@ describe("role-specific card costs and card inventory", () => {
     expect(state.players[1].cash).toBe(before + 80);
   });
 });
+
+describe("turn-changing card effects", () => {
+  it("marks a Citizen to skip a future turn after Investigation Notice", () => {
+    let state = createNewGame({ humanRole: "citizen" });
+    state = {
+      ...state,
+      currentPlayerIndex: 1,
+      cardDrawCounts: { community: 0, chance: 1 },
+      players: state.players.map((player, index) => index === 1 ? { ...player, position: 6 } : player),
+    };
+    state = movePlayer(state, "player-2", 1);
+    expect(state.players[1].skipTurns).toBe(1);
+  });
+
+  it("grants the Politician an extra roll from Public Holiday", () => {
+    let state = createNewGame({ humanRole: "politician" });
+    state = {
+      ...state,
+      cardDrawCounts: { community: 0, chance: 5 },
+      players: state.players.map((player, index) => index === 0 ? { ...player, position: 6 } : player),
+    };
+    state = movePlayer(state, "player-1", 1);
+    expect(state.extraRollAvailable).toBe(true);
+    state = endTurn(state);
+    expect(state.phase).toBe("awaiting-roll");
+    expect(state.currentPlayerIndex).toBe(0);
+    expect(state.extraRollAvailable).toBe(false);
+  });
+});
