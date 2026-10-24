@@ -14,21 +14,21 @@ function activeCitizens(state: GameState): Player[] {
 function checkVictory(state: GameState, atCitizenRoundStart = false): GameState {
   if (state.phase === "game-over") return state;
   const politician = state.players.find((p) => p.role === "politician");
-  if (!politician || politician.bankrupt) return { ...state, phase: "game-over", winner: "citizens" };
+  if (!politician || politician.bankrupt) return { ...state, phase: "game-over", winner: "citizens", pendingPropertyId: null };
   const citizens = activeCitizens(state);
   const controls = Object.values(state.properties).filter((p) => p.ownerId === politician.id || p.leaseholderId === politician.id).length;
   const assetValue = Object.values(state.properties).filter((p) => p.ownerId === politician.id).reduce((sum, p) => sum + (BOARD.find((s) => s.id === p.spaceId)?.price ?? 0), 0);
   if (state.players.filter((p) => p.role === "citizen" && p.bankrupt).length >= 2) {
-    return addEvent({ ...state, phase: "game-over", winner: "politician" }, "The Politician wins: two Citizens are bankrupt.");
+    return addEvent({ ...state, phase: "game-over", winner: "politician", pendingPropertyId: null }, "The Politician wins: two Citizens are bankrupt.");
   }
   if (controls >= 7 || politician.cash + assetValue >= 8_000) {
-    return addEvent({ ...state, phase: "game-over", winner: "politician" }, controls >= 7 ? "The Politician wins by controlling at least seven properties." : "The Politician wins by reaching ৳8,000 in cash and owned property value.");
+    return addEvent({ ...state, phase: "game-over", winner: "politician", pendingPropertyId: null }, controls >= 7 ? "The Politician wins by controlling at least seven properties." : "The Politician wins by reaching ৳8,000 in cash and owned property value.");
   }
   if (atCitizenRoundStart && state.charterPendingRound !== null && state.round > state.charterPendingRound) {
     const controlled = Object.values(state.properties).filter((p) => (p.ownerId !== null && citizens.some((citizen) => citizen.id === p.ownerId)) || state.cooperativePropertyIds.includes(p.spaceId)).length;
     const combinedCash = citizens.reduce((sum, citizen) => sum + citizen.cash, 0);
     if (citizens.length === 3 && controlled >= 8 && combinedCash >= 3_000 && state.cooperativeFund >= 1_000 && state.charterVotes.length >= 2) {
-      return addEvent({ ...state, phase: "game-over", winner: "citizens", charterActivated: true }, "The People's Charter held through the next Citizen round. All Citizens win together.");
+      return addEvent({ ...state, phase: "game-over", winner: "citizens", charterActivated: true, pendingPropertyId: null }, "The People's Charter held through the next Citizen round. All Citizens win together.");
     }
     return addEvent({ ...state, charterPendingRound: null, charterVotes: [] }, "The People's Charter conditions did not hold until the next Citizen round; Citizens may organize again.");
   }
@@ -39,7 +39,7 @@ function makePlayer(id: string, name: string, role: PlayerRole, controller: Cont
 }
 export function contributeToCooperative(state: GameState, playerId: string, amount: number): GameState {
   const player = state.players.find((p) => p.id === playerId);
-  if (!player || player.role !== "citizen" || !player.active || player.bankrupt) throw new Error("Only an active Citizen can contribute.");
+  if (state.phase === "game-over" || !player || player.id !== getCurrentPlayer(state).id || player.role !== "citizen" || !player.active || player.bankrupt) throw new Error("Only the current active Citizen can contribute.");
   if (!Number.isInteger(amount) || amount <= 0 || player.cash < amount) throw new Error("Contribution must be positive and affordable.");
   const next = { ...state, cooperativeFund: state.cooperativeFund + amount,
     players: state.players.map((p) => p.id === playerId ? { ...p, cash: p.cash - amount } : p) };
@@ -47,7 +47,7 @@ export function contributeToCooperative(state: GameState, playerId: string, amou
 }
 export function voteForCharter(state: GameState, playerId: string): GameState {
   const player = state.players.find((p) => p.id === playerId);
-  if (!player || player.role !== "citizen" || !player.active || player.bankrupt) throw new Error("Only an active Citizen may vote for the Charter.");
+  if (state.phase === "game-over" || !player || player.id !== getCurrentPlayer(state).id || player.role !== "citizen" || !player.active || player.bankrupt) throw new Error("Only the current active Citizen may vote for the Charter.");
   if (state.charterPendingRound !== null || state.charterActivated) throw new Error("The Charter is already pending or activated.");
   const votes = state.charterVotes.includes(playerId) ? state.charterVotes : [...state.charterVotes, playerId];
   let next = addEvent({ ...state, charterVotes: votes }, `${player.name} voted for the People's Charter (${votes.length} vote(s)).`);
