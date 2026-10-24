@@ -257,3 +257,10 @@
 .event-popup-toggle{flex-shrink:0;border:1px solid #9d8c6d;background:transparent;color:var(--ink);padding:.35rem .4rem;font-size:.5rem;font-weight:950;letter-spacing:.04em;white-space:nowrap}
 .event-popup-toggle.is-on{background:#e4b8a8;border-color:#a44735;color:#702d22}
 @media(max-width:580px){.event-popup-toggle{font-size:.46rem;padding:.3rem}.game-layout>.log-panel .panel-label{gap:.35rem}}
+
+
+/* Give each seat a stable, distinct player-token color across the board and sidebar. */
+.token.player-color-player-1,.mini-token.player-color-player-1,.large-token.player-color-player-1{background:#b74735;color:#fffaf0}
+.token.player-color-player-2,.mini-token.player-color-player-2,.large-token.player-color-player-2{background:#3976a8;color:#fff}
+.token.player-color-player-3,.mini-token.player-color-player-3,.large-token.player-color-player-3{background:#4f8151;color:#fff}
+.token.player-color-player-4,.mini-token.player-color-player-4,.large-token.player-color-player-4{background:#a56bb0;color:#fff}
