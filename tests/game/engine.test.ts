@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { BOARD_SPACE_COUNT } from "../../src/game/board";
-import { createNewGame, endTurn, getDiceCount, movePlayer, rollDice, rollAndMove, validateSetup } from "../../src/game/engine";
-import { runAiTurn } from "../../src/game/turns";
+import { createNewGame, endTurn, getDiceCount, movePlayer, rollDice, rollAndMove, resolvePropertyAction, validateSetup } from "../../src/game/engine";
+import { chooseAiPropertyAction, runAiTurn } from "../../src/game/turns";
+import { getLegalPropertyActions } from "../../src/game/properties";
 
 describe("game setup", () => {
   it("always creates one Politician, three Citizens, one human and three AI seats", () => {
@@ -64,5 +65,46 @@ describe("dice and movement", () => {
     state = runAiTurn(state, () => 0);
     expect(state.currentPlayerIndex).toBe(0);
     expect(state.round).toBe(2);
+  });
+});
+
+describe("property actions and rent", () => {
+  it("offers only affordable legal actions for an unclaimed property", () => {
+    let state = createNewGame({ humanRole: "politician" });
+    state = movePlayer(state, "player-1", 1);
+    expect(state.pendingPropertyId).toBe("old-dhaka");
+    expect(getLegalPropertyActions(state, state.players[0]).map((action) => action.type)).toEqual(["lease", "buy", "decline"]);
+  });
+  it("charges rent to a visitor and transfers it to the property owner", () => {
+    let state = createNewGame({ humanRole: "politician" });
+    state = movePlayer(state, "player-1", 1);
+    state = resolvePropertyAction(state, "buy");
+    state = endTurn(state);
+    const ownerCash = state.players[0].cash;
+    const visitorCash = state.players[1].cash;
+    state = movePlayer(state, "player-2", 1);
+    expect(state.players[0].cash).toBe(ownerCash + 10);
+    expect(state.players[1].cash).toBe(visitorCash - 10);
+    expect(state.pendingPropertyId).toBeNull();
+  });
+  it("leases at half price and gives Citizens a five-GO-pass term", () => {
+    let state = createNewGame({ humanRole: "citizen" });
+    state = { ...state, currentPlayerIndex: 1, players: state.players.map((player, index) => index === 1 ? { ...player, position: 0 } : player) };
+    state = movePlayer(state, "player-2", 1);
+    state = resolvePropertyAction(state, "lease");
+    expect(state.properties["old-dhaka"].leaseholderId).toBe("player-2");
+    expect(state.properties["old-dhaka"].leaseExpiresAtGoPass).toBe(5);
+    expect(state.players[1].cash).toBe(1_470);
+  });
+  it("AI chooses an affordable property action and resolves it before ending its turn", () => {
+    let state = createNewGame({ humanRole: "citizen" });
+    state = { ...state, players: state.players.map((player, index) => index === 0 ? { ...player, position: 39 } : player) };
+    state = rollAndMove(state, () => 0);
+    expect(state.pendingPropertyId).toBe("old-dhaka");
+    expect(chooseAiPropertyAction(state)).toBe("lease");
+    state = runAiTurn({ ...createNewGame({ humanRole: "citizen" }), players: state.players, currentPlayerIndex: 0, phase: "awaiting-roll", properties: state.properties, pendingPropertyId: null, events: state.events, nextEventId: state.nextEventId }, () => 0);
+    expect(state.properties["old-dhaka"].leaseholderId).toBe("player-1");
+    expect(state.currentPlayerIndex).toBe(1);
+    expect(state.pendingPropertyId).toBeNull();
   });
 });
