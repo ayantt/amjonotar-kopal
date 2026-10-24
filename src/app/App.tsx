@@ -1,9 +1,8 @@
 import { useEffect, useState } from "react";
 import { BOARD } from "../game/board";
-import { createNewGame, endTurn, getCurrentPlayer, isHumanTurn, rollAndMove, validateSetup } from "../game/engine";
+import { createNewGame, endTurn, getCurrentPlayer, isHumanTurn, resolvePropertyAction, rollAndMove, validateSetup } from "../game/engine";
 import { runAiTurn } from "../game/turns";
 import { getLegalPropertyActions } from "../game/properties";
-import { resolvePropertyAction } from "../game/engine";
 import type { GameState, PlayerRole } from "../game/types";
 
 const money = (amount: number) => `৳${amount.toLocaleString("en-BD")}`;
@@ -94,6 +93,8 @@ export function App() {
             return <div style={boardPosition(index)} className={`space space-${space.type} ${space.color ? `color-${space.color}` : ""}`} key={space.id}>
               <span className="space-index">{String(index).padStart(2, "0")}</span><strong>{space.name}</strong><small>{space.subtitle}</small>
               {space.price !== undefined && <span className="space-price">{money(space.price)}</span>}
+              {game.properties[space.id]?.ownerId && <small className="ownership-tag">OWN: {game.players.find((player) => player.id === game.properties[space.id].ownerId)?.name ?? "Unknown"}</small>}
+              {game.properties[space.id]?.leaseholderId && <small className="ownership-tag">LEASE: {game.players.find((player) => player.id === game.properties[space.id].leaseholderId)?.name ?? "Unknown"}</small>}
               {occupants.length > 0 && <div className="tokens">{occupants.map((player) => <span title={`${player.name} · ${roleName(player.role)}`} key={player.id} className={`token ${player.role} ${player.controller}`}>{player.controller === "human" ? "YOU" : player.role === "politician" ? "P" : player.name.slice(0,1)}</span>)}</div>}
             </div>;
           })}
