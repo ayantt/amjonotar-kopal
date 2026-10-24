@@ -17,7 +17,7 @@
 Exit: a user can play successive rounds against three automatic opponents without manual state repair.
 
 ## Phase 2 — Property loop and strategic AI
-- [ ] Purchase/lease, ownership, rent, railroad, utilities, tax, and destination effects.
+- [x] Purchase/lease, ownership, rent, railroad, utilities, tax, and destination effects.
 - [x] Legal property-action list consumed by both human UI and AI.
 - [x] Baseline Politician and Citizen property strategies based on legal actions.
 - [x] AI choices are validated against legal actions, logged, bounded, and use only its current role/cash/legal options.
@@ -25,13 +25,13 @@ Exit: a user can play successive rounds against three automatic opponents withou
 Exit: several laps can be played with all AI turns resolving reliably and property decisions available.
 
 ## Phase 3 — Cards and funds
-- [ ] Typed card resolver, 32 cards, shuffling/discard.
-- [ ] Public and cooperative funds, jail, skip turns.
-- [ ] AI card/debt handling; tests for effects and transfer destinations.
+- [x] Typed card resolver and 32 role-specific card definitions. Shuffling/discard remains future work.
+- [x] Public and cooperative fund transfers, Administrative Hold, skip turns, and extra-roll effects.
+- [x] AI card handling, automatic mortgage fallback, bankruptcy outcomes, and initial card/debt tests.
 
 ## Phase 4 — Cooperation/economy
 - [ ] Contributions, voting, cooperative property.
-- [ ] Housing, mortgages, debt, bankruptcy.
+- [ ] Housing, mortgage redemption, debt-choice UI, and broader bankruptcy edge-case coverage.
 - [ ] AI Citizens coordinate through explicit shared rules and actions.
 - [ ] Both victory routes and boundary tests.
 - [ ] Simulate balance; tune values.
