@@ -108,7 +108,7 @@ function pay(state: GameState, payerId: string, recipientId: string | null, amou
       const space = BOARD.find((s) => s.id === asset.spaceId);
       const price = space?.price ?? 0;
       const gross = payer.role === "politician" ? price : Math.floor(price / 2);
-      const fee = payer.role === "politician" ? 0 : Math.floor(price * 0.05);
+      const fee = payer.role === "politician" ? 0 : Math.floor(gross * 0.05);
       const proceeds = Math.max(0, gross - fee);
       if (proceeds <= 0) continue;
       next = { ...next, properties: { ...next.properties, [asset.spaceId]: { ...asset, mortgaged: true } },
