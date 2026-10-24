@@ -4,7 +4,7 @@ export type Controller = "human" | "ai";
 export interface Player {
   id: string; name: string; role: PlayerRole; controller: Controller;
   cash: number; position: number; active: boolean; lastRoll: number[];
-  goPasses: number; bankrupt: boolean;
+  goPasses: number; bankrupt: boolean; skipTurns: number;
 }
 export interface PropertyState {
   spaceId: string;
@@ -17,7 +17,7 @@ export type GamePhase = "role-selection" | "awaiting-roll" | "awaiting-end-turn"
 export interface GameEvent { id: number; message: string; kind: "system" | "movement" | "money" | "ai"; }
 export interface GameState {
   schemaVersion: 1; phase: GamePhase; players: Player[]; currentPlayerIndex: number;
-  publicFund: number; cooperativeFund: number; properties: Record<string, PropertyState>;
+  publicFund: number; cooperativeFund: number; properties: Record<string, PropertyState>;\n  cardDrawCounts: { community: number; chance: number }; extraRollAvailable: boolean;
   pendingPropertyId: string | null; events: GameEvent[]; nextEventId: number;
   round: number; winner: string | null;
 }
