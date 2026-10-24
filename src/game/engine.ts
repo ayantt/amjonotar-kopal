@@ -366,6 +366,45 @@ export function resolvePropertyAction(state: GameState, action: PropertyAction):
   }
   return checkVictory(next);
 }
+export function sellProperty(state: GameState, sellerId: string, spaceId: string): GameState {
+  if (state.phase === "game-over") throw new Error("The game has ended.");
+  const seller = state.players.find((player) => player.id === sellerId);
+  const current = getCurrentPlayer(state);
+  const space = BOARD.find((item) => item.id === spaceId);
+  const property = state.properties[spaceId];
+  if (!seller || seller.id !== current.id || seller.controller !== "human" || !isHumanTurn(state)) {
+    throw new Error("Only the human player may sell during their own turn.");
+  }
+  if (!space?.price || !property || property.ownerId !== sellerId) throw new Error("You can only sell property that you own.");
+  if (property.leaseholderId) throw new Error("A property with an active lease cannot be sold.");
+  if (state.cooperativePropertyIds.includes(spaceId)) throw new Error("Cooperative property cannot be sold by an individual player.");
+  const price = space.price;
+  const politician = state.players.find((player) => player.role === "politician");
+  if (seller.role === "citizen") {
+    if (!politician || politician.bankrupt || politician.cash < price) {
+      throw new Error("The Politician does not have enough cash to buy this property.");
+    }
+    const tax = Math.floor(price * 0.1);
+    const proceeds = price - tax;
+    let next: GameState = {
+      ...state,
+      players: state.players.map((player) => player.id === politician.id
+        ? { ...player, cash: player.cash - price }
+        : player.id === sellerId ? { ...player, cash: player.cash + proceeds } : player),
+      publicFund: state.publicFund + tax,
+      properties: { ...state.properties, [spaceId]: { ...property, ownerId: politician.id, mortgaged: false } },
+    };
+    next = addEvent(next, `${seller.name} sold ${space.name} to the Politician for ৳${price}; ৳${tax} (10%) was paid to the public treasury and the seller received ৳${proceeds}.`, "money");
+    return checkVictory(next);
+  }
+  const next: GameState = {
+    ...state,
+    players: state.players.map((player) => player.id === sellerId ? { ...player, cash: player.cash + price } : player),
+    publicFund: state.publicFund - price,
+    properties: { ...state.properties, [spaceId]: { ...property, ownerId: null, mortgaged: false } },
+  };
+  return checkVictory(addEvent(next, `${seller.name} sold ${space.name} back to the government for ৳${price}; no sales tax was charged. The property is now unowned.`, "money"));
+}
 export function endTurn(state: GameState): GameState {
   if (state.phase !== "awaiting-end-turn") throw new Error("Roll and resolve movement before ending the turn.");
   if (state.pendingPropertyId) throw new Error("Resolve the property decision before ending the turn.");
