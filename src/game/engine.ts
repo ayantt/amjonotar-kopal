@@ -95,7 +95,7 @@ function pay(state: GameState, payerId: string, recipientId: string | null, amou
   if (!payer || payer.bankrupt) return state;
   let next = state;
   let remaining = amount;
-  // First use cash, then automatically mortgage owned properties at half purchase price.
+  // First use cash, then automatically mortgage owned properties using role-specific loan terms.
   const cashPaid = Math.min(payer.cash, remaining);
   if (cashPaid > 0) {
     next = { ...next, players: next.players.map((p) => p.id === payerId ? { ...p, cash: p.cash - cashPaid } : p) };
@@ -106,19 +106,18 @@ function pay(state: GameState, payerId: string, recipientId: string | null, amou
     for (const asset of assets) {
       if (remaining <= 0) break;
       const space = BOARD.find((s) => s.id === asset.spaceId);
-      const proceeds = Math.floor((space?.price ?? 0) / 2);
+      const price = space?.price ?? 0;
+      const gross = payer.role === "politician" ? price : Math.floor(price / 2);
+      const fee = payer.role === "politician" ? 0 : Math.floor(price * 0.05);
+      const proceeds = Math.max(0, gross - fee);
       if (proceeds <= 0) continue;
-      const raised = Math.min(proceeds, remaining);
       next = { ...next, properties: { ...next.properties, [asset.spaceId]: { ...asset, mortgaged: true } },
-        players: next.players.map((p) => p.id === payerId ? { ...p, cash: p.cash + proceeds } : p) };
-      next = addEvent(next, `${payer.name} mortgaged ${space?.name ?? asset.spaceId} for ৳${proceeds} to cover ${reason}.`, "money");
+        players: next.players.map((p) => p.id === payerId ? { ...p, cash: p.cash + proceeds } : p),
+        publicFund: next.publicFund + fee };
+      next = addEvent(next, `${payer.name} mortgaged ${space?.name ?? asset.spaceId}: received ৳${proceeds}${fee ? ` after a ৳${fee} processing fee` : ""} to cover ${reason}.`, "money");
       const paidFromMortgage = Math.min(proceeds, remaining);
       next = { ...next, players: next.players.map((p) => p.id === payerId ? { ...p, cash: p.cash - paidFromMortgage } : p) };
       remaining -= paidFromMortgage;
-      if (raised < proceeds) {
-        const excess = proceeds - paidFromMortgage;
-        next = { ...next, players: next.players.map((p) => p.id === payerId ? { ...p, cash: p.cash + excess } : p) };
-      }
     }
   }
   const paid = amount - remaining;
@@ -364,6 +363,64 @@ export function resolvePropertyAction(state: GameState, action: PropertyAction):
     next = { ...state, pendingPropertyId: null };
     next = addEvent(next, `${player.name} declined ${space.name}.`);
   }
+  return checkVictory(next);
+}
+export interface MortgageTerms {
+  grossAdvance: number;
+  processingFee: number;
+  netAdvance: number;
+  redemptionAmount: number;
+}
+export function getMortgageTerms(role: Player["role"], price: number): MortgageTerms {
+  const grossAdvance = role === "politician" ? price : Math.floor(price / 2);
+  const processingFee = role === "politician" ? 0 : Math.floor(price * 0.05);
+  return {
+    grossAdvance,
+    processingFee,
+    netAdvance: grossAdvance - processingFee,
+    redemptionAmount: Math.ceil(price * (role === "politician" ? 1.08 : 1.1)),
+  };
+}
+export function mortgageProperty(state: GameState, playerId: string, spaceId: string): GameState {
+  if (state.phase === "game-over") throw new Error("The game has ended.");
+  const player = state.players.find((item) => item.id === playerId);
+  const current = getCurrentPlayer(state);
+  const space = BOARD.find((item) => item.id === spaceId);
+  const property = state.properties[spaceId];
+  if (!player || player.id !== current.id || player.controller !== "human" || !isHumanTurn(state)) {
+    throw new Error("Only the human player may mortgage property during their own turn.");
+  }
+  if (!space?.price || !property || property.ownerId !== playerId) throw new Error("You can only mortgage property that you own.");
+  if (property.mortgaged) throw new Error("This property is already mortgaged.");
+  if (property.leaseholderId || state.cooperativePropertyIds.includes(spaceId)) throw new Error("Leased and cooperative properties cannot be mortgaged.");
+  const terms = getMortgageTerms(player.role, space.price);
+  let next: GameState = {
+    ...state,
+    players: state.players.map((item) => item.id === playerId ? { ...item, cash: item.cash + terms.netAdvance } : item),
+    publicFund: state.publicFund + terms.processingFee,
+    properties: { ...state.properties, [spaceId]: { ...property, mortgaged: true } },
+  };
+  next = addEvent(next, `${player.name} mortgaged ${space.name}: gross loan ৳${terms.grossAdvance}, processing fee ৳${terms.processingFee}, net received ৳${terms.netAdvance}. Redemption costs ৳${terms.redemptionAmount}.`, "money");
+  return checkVictory(next);
+}
+export function redeemMortgage(state: GameState, playerId: string, spaceId: string): GameState {
+  if (state.phase === "game-over") throw new Error("The game has ended.");
+  const player = state.players.find((item) => item.id === playerId);
+  const current = getCurrentPlayer(state);
+  const space = BOARD.find((item) => item.id === spaceId);
+  const property = state.properties[spaceId];
+  if (!player || player.id !== current.id || player.controller !== "human" || !isHumanTurn(state)) {
+    throw new Error("Only the human player may clear a mortgage during their own turn.");
+  }
+  if (!space?.price || !property || property.ownerId !== playerId || !property.mortgaged) throw new Error("You can only clear a mortgage on property you own.");
+  const amount = getMortgageTerms(player.role, space.price).redemptionAmount;
+  if (player.cash < amount) throw new Error(`You need ৳${amount} in available cash to clear this mortgage.`);
+  let next: GameState = {
+    ...state,
+    players: state.players.map((item) => item.id === playerId ? { ...item, cash: item.cash - amount } : item),
+    properties: { ...state.properties, [spaceId]: { ...property, mortgaged: false } },
+  };
+  next = addEvent(next, `${player.name} cleared the mortgage on ${space.name} by paying ৳${amount} (principal plus ${player.role === "politician" ? "8%" : "10%"} interest).`, "money");
   return checkVictory(next);
 }
 export function sellProperty(state: GameState, sellerId: string, spaceId: string): GameState {
