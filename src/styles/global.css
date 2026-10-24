@@ -120,3 +120,17 @@
 .constitution-bangla{font-family:"Noto Serif Bengali","Noto Sans Bengali",serif!important;color:#5c574b!important;padding-left:.7rem;border-left:2px solid #c7b99d}
 .constitution-heading-bangla{font-family:"Noto Serif Bengali","Noto Sans Bengali",serif!important;font-size:.9rem!important;font-weight:700;color:#716751;margin-top:-.35rem!important}
 .constitution-preamble p[lang="bn"]{font-family:"Noto Serif Bengali","Noto Sans Bengali",serif}
+
+
+/* Timed event notices replay the exact official-record messages over the board. */
+.board-wrap{position:relative}
+.board-event-popup{position:absolute;z-index:20;left:50%;top:50%;transform:translate(-50%,-50%);width:min(440px,78%);padding:1.25rem 1.4rem 1rem;background:#f5efdf;color:#25251f;border:2px solid #25251f;box-shadow:0 14px 45px rgba(0,0,0,.38);text-align:center;animation:event-popup-in .22s ease-out}
+.board-event-popup:before{content:"";position:absolute;inset:5px;border:1px solid #c7b99d;pointer-events:none}
+.board-event-kicker{display:block;font-size:.58rem;font-weight:950;letter-spacing:.14em;color:#a44735;margin-bottom:.65rem}
+.board-event-popup p{position:relative;margin:0 auto .9rem;font-family:Georgia,"Noto Serif Bengali",serif;font-size:clamp(.9rem,1.4vw,1.15rem);font-weight:700;line-height:1.5;overflow-wrap:anywhere}
+.board-event-popup button{position:relative;border:1px solid #9d8c6d;background:transparent;padding:.45rem .65rem;font-size:.58rem;font-weight:900;letter-spacing:.1em}
+.event-popup-money{border-bottom:5px solid #7b8a50}
+.event-popup-ai{border-bottom:5px solid #a44735}
+.event-popup-system{border-bottom:5px solid #b28a46}
+@keyframes event-popup-in{from{opacity:0;transform:translate(-50%,-46%)}to{opacity:1;transform:translate(-50%,-50%)}}
+@media(max-width:580px){.board-event-popup{width:84%;padding:1rem 1rem .8rem}.board-event-kicker{font-size:.5rem}.board-event-popup p{font-size:.9rem}}
