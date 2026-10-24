@@ -9,10 +9,8 @@ function addEvent(state: GameState, message: string, kind: GameEvent["kind"] = "
 function makePlayer(id: string, name: string, role: PlayerRole, controller: Controller): Player {
   return { id, name, role, controller, cash: role === "politician" ? GAME_RULES.politicianStartingCash : GAME_RULES.citizenStartingCash, position: 0, active: true, lastRoll: [] };
 }
-export function createNewGame({ humanRole, random = defaultRandom }: NewGameOptions): GameState {
-  const roles: PlayerRole[] = humanRole === "politician"
-    ? ["politician", "citizen", "citizen", "citizen"]
-    : ["politician", "citizen", "citizen", "citizen"];
+export function createNewGame({ humanRole }: NewGameOptions): GameState {
+  const roles: PlayerRole[] = ["politician", "citizen", "citizen", "citizen"];
   const humanIndex = humanRole === "politician" ? 0 : 1;
   const names = ["The Honourable Leader", "Asha", "Rafi", "Mina"];
   const players = roles.map((role, index) => makePlayer(
@@ -21,14 +19,17 @@ export function createNewGame({ humanRole, random = defaultRandom }: NewGameOpti
     role,
     index === humanIndex ? "human" : "ai",
   ));
-  // Keep the Politician in seat one; if the human chooses Citizen, that seat is AI-controlled.
   const initial: GameState = { schemaVersion: 1, phase: "awaiting-roll", players, currentPlayerIndex: 0, publicFund: 0, cooperativeFund: 0, events: [], nextEventId: 1, round: 1, winner: null };
   const state = addEvent(initial, `Game started. You play as ${humanRole === "politician" ? "Politician" : "Citizen"}; three opponents are computer-controlled.`);
   return addEvent(state, `The board has ${BOARD_SPACE_COUNT} spaces. All players begin at Shurur Line.`);
 }
 export function rollDice(count: number, random: () => number = defaultRandom): number[] {
   if (!Number.isInteger(count) || count < 1) throw new Error("Dice count must be a positive integer.");
-  return Array.from({ length: count }, () => Math.floor(random() * 6) + 1);
+  return Array.from({ length: count }, () => {
+    const sample = random();
+    if (!(sample >= 0 && sample < 1)) throw new Error("Random source must return a value in [0, 1).");
+    return Math.floor(sample * 6) + 1;
+  });
 }
 export function getDiceCount(player: Player): number {
   return player.role === "politician" ? GAME_RULES.politicianDiceCount : GAME_RULES.citizenDiceCount;
@@ -49,9 +50,8 @@ export function movePlayer(state: GameState, playerId: string, steps: number): G
   const cashReward = (crossedGo ? reward : 0) + (exactGo ? exactBonus : 0);
   let next: GameState = {
     ...state,
-    players: state.players.map((candidate, i) => i === index ? {
-      ...candidate, position: newPosition, cash: candidate.cash + cashReward,
-    } : candidate),
+    phase: "awaiting-end-turn",
+    players: state.players.map((candidate, i) => i === index ? { ...candidate, position: newPosition, cash: candidate.cash + cashReward } : candidate),
   };
   next = addEvent(next, `${player.name} moved ${steps} spaces to ${BOARD[newPosition].name}.`, "movement");
   if (crossedGo) next = addEvent(next, `${player.name} collected ৳${reward} for passing Shurur Line.`, "money");
@@ -68,18 +68,15 @@ export function rollAndMove(state: GameState, random: () => number = defaultRand
   return movePlayer(rolledState, player.id, total);
 }
 export function endTurn(state: GameState): GameState {
-  if (state.phase !== "awaiting-roll") throw new Error("Cannot end turn in this phase.");
+  if (state.phase !== "awaiting-end-turn") throw new Error("Roll and resolve movement before ending the turn.");
   const nextIndex = (state.currentPlayerIndex + 1) % state.players.length;
   const round = nextIndex === 0 ? state.round + 1 : state.round;
-  return addEvent({ ...state, currentPlayerIndex: nextIndex, round }, `Round ${round}: ${state.players[nextIndex].name}'s turn.`);
+  return addEvent({ ...state, phase: "awaiting-roll", currentPlayerIndex: nextIndex, round }, `Round ${round}: ${state.players[nextIndex].name}'s turn.`);
 }
-export function getCurrentPlayer(state: GameState): Player {
-  return state.players[state.currentPlayerIndex];
-}
+export function getCurrentPlayer(state: GameState): Player { return state.players[state.currentPlayerIndex]; }
 export function isHumanTurn(state: GameState): boolean {
-  return state.phase === "awaiting-roll" && getCurrentPlayer(state).controller === "human";
+  return (state.phase === "awaiting-roll" || state.phase === "awaiting-end-turn") && getCurrentPlayer(state).controller === "human";
 }
-export function getSpaceForPlayer(player: Player) { return BOARD[player.position]; }
 export function validateSetup(state: GameState): boolean {
   return state.players.length === 4 &&
     state.players.filter((p) => p.role === "politician").length === 1 &&
