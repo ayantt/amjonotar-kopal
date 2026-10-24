@@ -167,3 +167,9 @@
   .role-card{min-height:145px;padding:1rem}
   .site-footer{padding:.75rem 0}
 }
+
+/* Enlarge the landing-page Bangla eyebrow and main title by 50%. */
+.hero .eyebrow{font-size:1.08rem}
+.hero h1{font-size:clamp(5.1rem,12.75vw,10.5rem)}
+@media(max-height:800px) and (min-width:581px){.hero h1{font-size:clamp(4.8rem,10.5vw,8.7rem)}}
+@media(max-width:580px){.hero h1{font-size:clamp(6rem,27vw,9rem)}}
