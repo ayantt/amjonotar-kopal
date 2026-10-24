@@ -4,3 +4,5 @@
 .ownership-tag{font-size:clamp(.38rem,.58vw,.5rem)!important;font-weight:900;color:#426b4b;overflow-wrap:anywhere}
 
 .game-over-panel{display:flex;align-items:center;justify-content:space-between;gap:1rem;flex-wrap:wrap;padding:1rem 1.2rem;margin:1rem 0;background:#f2e8d6;border:1px solid #c6ad86}.game-over-panel>strong{letter-spacing:.12em}.game-over-panel p{margin:0;flex:1;min-width:12rem}
+
+.cooperative-actions{display:grid;gap:.65rem;margin-top:1rem;padding-top:1rem;border-top:1px solid #d8cfbf}.cooperative-buttons{display:grid;grid-template-columns:1fr 1fr;gap:.5rem}.cooperative-actions small{line-height:1.45;color:#6d6559}.cooperative-actions button:disabled{opacity:.45;cursor:not-allowed}
