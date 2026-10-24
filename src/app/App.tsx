@@ -227,7 +227,7 @@ export function App() {
               : "Actual rent may differ from base rent depending on the owner's role, lease terms, and any applicable game rules."}</p>
         </div>
         <footer className="property-modal-footer"><span>THE REPUBLIC OF OPPORTUNITY · SPACE {BOARD.findIndex((space) => space.id === selectedSpace.id)}</span><div className="property-modal-actions">
-          {selectedProperty?.ownerId === current.id && current.controller === "human" && isHumanTurn(game) && !selectedProperty.leaseholderId && !game.cooperativePropertyIds.includes(selectedSpace.id) && selectedSpace.price !== undefined && <button className="sell-property-button" disabled={current.role === "citizen" && (game.players.find((player) => player.role === "politician")?.cash ?? 0) < selectedSpace.price} onClick={() => {
+          {selectedProperty?.ownerId === current.id && current.controller === "human" && isHumanTurn(game) && !selectedProperty.leaseholderId && !selectedProperty.mortgaged && !game.cooperativePropertyIds.includes(selectedSpace.id) && selectedSpace.price !== undefined && <button className="sell-property-button" disabled={current.role === "citizen" && (game.players.find((player) => player.role === "politician")?.cash ?? 0) < selectedSpace.price} onClick={() => {
             const next = sellProperty(game, current.id, selectedSpace.id);
             setGame(next);
             setSelectedPropertyId(null);
