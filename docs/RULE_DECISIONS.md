@@ -11,6 +11,7 @@ Track unresolved conflicts here. When resolving one, update the rulebook/catalog
 - RD-006: integer taka; public and cooperative funds separate.
 - RD-007: engine validates every action; AI chooses only from legal actions.
 - RD-008: no building on another player's property; permit mechanic deferred.
+- RD-120: Housing: Citizens need a full color group and build evenly; costs are ৳200/৳300/৳400/৳600 for houses/hotel, with 2×/3×/4×/6× rent multipliers. Politician pays half, needs no group, may build a hotel directly, and pays no maintenance. Citizens pay ৳50 per house and ৳200 per hotel when passing GO.
 - RD-009: declined properties remain unowned; no auction in MVP.
 - RD-010: no backend/auth/multiplayer/remote AI service in MVP.
 - RD-011: AI receives only player-appropriate information; no cheating or hidden-state access.
