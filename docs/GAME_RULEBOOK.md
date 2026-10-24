@@ -31,6 +31,16 @@ Citizen on another Citizen's property pays normal development-adjusted rent. Cit
 - Income Tax currently charges Citizens ৳100 and the Politician ৳50. Development Levy charges Citizens ৳100 and exempts the Politician. Politician landing on Public Plaza withdraws the available public treasury; other players receive no jackpot.
 - These are initial Phase 2 values. Card effects, cooperative properties, debt/bankruptcy settlement, houses, and victory triggers are not yet active in the engine. If a player cannot pay, the current fallback charges available cash and logs the shortfall; full debt resolution is pending.
 
+## Implemented card and debt resolution
+
+- The two typed decks contain 16 Community cards and 16 Chance cards each. Cards are drawn in a deterministic catalog order, which makes tests reproducible; shuffling is not implemented yet.
+- Card effects are role-specific and execute in listed order. Current effects include cash income and costs, payments to the public fund, conditional withdrawals from available public funds, Citizen contributions, Citizen-to-Politician collections, movement with destination resolution, skipped turns, Administrative Hold, and an extra roll.
+- Optional Citizen contributions are automatically skipped for the human player (to avoid silently spending their cash without a choice); AI Citizens contribute only when they can afford the amount. The human receives an event-log explanation. This is a temporary interaction rule until explicit card-choice UI is added.
+- Conditional public-fund collections pay only the available amount; any shortfall is waived rather than carried as hidden debt. Conditional public payments are skipped when the public-fund condition is not met.
+- Payments first use available cash, then automatically mortgage the debtor's unmortgaged owned properties at half purchase price. If the bill still cannot be paid, the debtor is declared bankrupt, remaining cash is set to zero, owned property is transferred according to the current rule (Citizen assets go to the Politician; Politician assets go to the named creditor where applicable), and the player's leases are cleared.
+- Bankruptcy ends the game if the Politician goes bankrupt (Citizens win) or when two Citizens go bankrupt (Politician wins). This milestone does not yet implement the separate cooperative Citizen victory condition or mortgage redemption.
+- The event log records card draws, payments, mortgage actions, bankruptcy, and skip-turn effects. The board UI shows deck draw counts and a game-over message.
+
 ## Housing (later phase)
 Levels: none (1×), 1 house (2×), 2 houses (3×), 3 houses (4×), hotel (6×). Incremental Citizen costs: ৳200, ৳300, ৳400, ৳600. Citizens must own full color group and build evenly. Citizen maintenance: ৳50 per house each GO pass; hotel maintenance provisionally ৳200 per GO pass. Politician may build on owned properties without group completion, pays half upgrade cost, and may upgrade directly to hotel. No building on another player's property; permit-fee idea is deferred.
 
