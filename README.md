@@ -7,7 +7,7 @@ A single human plays against three computer-controlled opponents. Each game has 
 > Fictional political satire. Use fictional composites; do not imply allegations about specific real people.
 
 ## Status
-Specification and starter scaffold. Full gameplay and AI opponents are not implemented yet.
+**Phase 1 implemented:** role selection, a 40-space fictional board, role-based dice, movement, GO rewards, automatic AI turns, event log, and restart. Property transactions, card effects, strategic AI, and victory mechanics remain future milestones.
 
 ## Docs
 - [Product specification](docs/PRODUCT_SPEC.md)
