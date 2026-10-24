@@ -35,3 +35,9 @@ Never silently invent behavior for unresolved rules. Mark decision resolved, rec
 - RD-112: Optional contributions are skipped automatically for a human player because a card-choice interaction is not yet implemented; AI contributes only when affordable.
 - RD-113: Card draws are deterministic and cycle through the 16-card catalog in order; deck draw counts are tracked in state.
 - RD-114: Citizen bankruptcy transfers owned assets to the Politician. Politician bankruptcy ends the game in a Citizen victory. The Politician wins on the second Citizen bankruptcy.
+
+## Cooperative economy implementation notes
+- RD-115: Citizen contributions are currently explicit ৳100/৳500 actions; no forced contributions are made by the UI.
+- RD-116: Cooperative properties are tracked separately from individual owners; rent is paid into the cooperative fund.
+- RD-117: Charter activation requires a majority of active Citizen votes and at least ৳1,000 in the cooperative fund. The fund and victory thresholds are checked at the next Citizen round.
+- RD-118: Politician victory checks are evaluated after movement/property actions and at turn advancement: seven controlled properties, ৳8,000 cash plus owned-property value, or two bankrupt Citizens.
