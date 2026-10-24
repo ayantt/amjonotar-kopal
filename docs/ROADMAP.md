@@ -18,10 +18,10 @@ Exit: a user can play successive rounds against three automatic opponents withou
 
 ## Phase 2 — Property loop and strategic AI
 - [ ] Purchase/lease, ownership, rent, railroad, utilities, tax, and destination effects.
-- [ ] Legal-action API consumed by both human UI and AI.
-- [ ] Baseline Politician and Citizen strategies based on legal actions.
-- [ ] AI choices are validated, logged, bounded, and use no hidden information.
-- [ ] Tests for illegal-action fallback and completed AI turns.
+- [x] Legal property-action list consumed by both human UI and AI.
+- [x] Baseline Politician and Citizen property strategies based on legal actions.
+- [x] AI choices are validated against legal actions, logged, bounded, and use only its current role/cash/legal options.
+- [x] Tests for property actions, rent transfers, and completed AI turns.
 Exit: several laps can be played with all AI turns resolving reliably and property decisions available.
 
 ## Phase 3 — Cards and funds
