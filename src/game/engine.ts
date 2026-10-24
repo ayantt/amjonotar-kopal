@@ -63,7 +63,7 @@ export function voteForCharter(state: GameState, playerId: string): GameState {
 export function buyCooperativeProperty(state: GameState, playerId: string): GameState {
   const player = state.players.find((p) => p.id === playerId);
   const space = BOARD.find((s) => s.id === state.pendingPropertyId);
-  if (state.phase !== "awaiting-end-turn" || !state.pendingPropertyId || !space || !player || player.role !== "citizen") throw new Error("A Citizen must be at an unclaimed property to propose a cooperative purchase.");
+  if (state.phase !== "awaiting-end-turn" || !state.pendingPropertyId || !space || !player || player.id !== getCurrentPlayer(state).id || player.role !== "citizen") throw new Error("A Citizen must be at an unclaimed property to propose a cooperative purchase.");
   const cost = space.price ?? 0;
   const property = state.properties[space.id];
   if (!property || property.ownerId || property.leaseholderId || state.cooperativePropertyIds.includes(space.id) || cost <= 0 || state.cooperativeFund < cost) throw new Error("The cooperative fund cannot afford this property.");
