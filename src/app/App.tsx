@@ -14,6 +14,8 @@ export function App() {
   const [showConstitution, setShowConstitution] = useState(false);
   const [selectedPropertyId, setSelectedPropertyId] = useState<string | null>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [showEventPopups, setShowEventPopups] = useState(true);
+  const [displayedEvents, setDisplayedEvents] = useState<GameState["events"]>([]);
   const [eventQueue, setEventQueue] = useState<Array<{ id: number; message: string; kind: string }>>([]);
   const [activeEvent, setActiveEvent] = useState<{ id: number; message: string; kind: string } | null>(null);
   const lastSeenEventId = useRef<number | null>(null);
@@ -40,24 +42,45 @@ export function App() {
   }, [game, activeEvent, eventQueue.length]);
 
   useEffect(() => {
-    if (!game || game.events.length === 0) return;
+    if (!game) return;
+    if (game.events.length === 0) {
+      setDisplayedEvents([]);
+      return;
+    }
     const latestId = game.events[game.events.length - 1].id;
     if (lastSeenEventId.current === null) {
       lastSeenEventId.current = latestId;
+      setDisplayedEvents(game.events);
       return;
     }
     const newEvents = game.events.filter((event) => event.id > (lastSeenEventId.current ?? 0));
+    if (!showEventPopups) {
+      lastSeenEventId.current = latestId;
+      setDisplayedEvents(game.events);
+      setEventQueue([]);
+      setActiveEvent(null);
+      return;
+    }
     if (newEvents.length > 0) {
       lastSeenEventId.current = latestId;
       setEventQueue((queue) => [...queue, ...newEvents.map((event) => ({ id: event.id, message: event.message, kind: event.kind }))]);
     }
-  }, [game]);
+  }, [game, showEventPopups]);
 
   useEffect(() => {
-    if (activeEvent || eventQueue.length === 0) return;
+    if (!showEventPopups || activeEvent || eventQueue.length === 0) return;
     setActiveEvent(eventQueue[0]);
     setEventQueue((queue) => queue.slice(1));
-  }, [activeEvent, eventQueue]);
+  }, [showEventPopups, activeEvent, eventQueue]);
+
+  useEffect(() => {
+    if (!activeEvent || !showEventPopups) return;
+    setDisplayedEvents((events) => events.some((event) => event.id === activeEvent.id)
+      ? events
+      : [...events, activeEvent as GameState["events"][number]]);
+    const timer = window.setTimeout(() => setActiveEvent(null), 2600);
+    return () => window.clearTimeout(timer);
+  }, [activeEvent, showEventPopups]);
 
   useEffect(() => {
     if (!activeEvent) return;
@@ -70,6 +93,7 @@ export function App() {
     if (!validateSetup(next)) throw new Error("Invalid four-player setup.");
     setGame(next);
     lastSeenEventId.current = null;
+    setDisplayedEvents([]);
     setEventQueue([]);
     setActiveEvent(null);
     setBusy(false);
@@ -153,7 +177,15 @@ export function App() {
     <section className="game-intro"><div><p className="eyebrow">THE PEOPLE PAY. THE POWERFUL PLAY.</p><h1>The board is <em>rigged.</em></h1></div><p>{busy ? "The computer is making its move…" : lastAction}</p></section>
     {game.phase === "game-over" && <section className="game-over-panel"><strong>GAME OVER</strong><p>{game.winner === "politician" ? "The Politician wins by consolidating power, wealth, or through Citizen bankruptcies." : game.winner === "citizens" ? (game.charterActivated ? "The Citizens held the People's Charter and win together." : "The Politician has gone bankrupt. The Citizens win together.") : "The game has ended."}</p><button className="primary-action" onClick={restart}>Start a new game ↗</button></section>}
     <section className="game-layout">
-    <section className="panel log-panel"><div className="panel-label">THE OFFICIAL RECORD <span>RECENT EVENTS</span></div><div className="event-list">{[...game.events].reverse().map((event) => <div className={`event event-${event.kind}`} key={event.id}><span>{String(event.id).padStart(3,"0")}</span><p>{event.message}</p></div>)}</div></section>
+    <section className="panel log-panel"><div className="panel-label"><span className="record-title">THE OFFICIAL RECORD <small>RECENT EVENTS</small></span><button className={`event-popup-toggle ${showEventPopups ? "is-on" : ""}`} type="button" aria-pressed={showEventPopups} onClick={() => {
+      const next = !showEventPopups;
+      setShowEventPopups(next);
+      if (!next) {
+        setDisplayedEvents(game.events);
+        setEventQueue([]);
+        setActiveEvent(null);
+      }
+    }}>POPUPS {showEventPopups ? "ON" : "OFF"}</button></div><div className="event-list">{[...displayedEvents].reverse().map((event) => <div className={`event event-${event.kind}`} key={event.id}><span>{String(event.id).padStart(3,"0")}</span><p>{event.message}</p></div>)}</div></section>
       <div className="board-wrap">
         <div className="board-heading"><span>THE REPUBLIC OF OPPORTUNITY</span><span className="board-heading-actions"><span>40 SPACES</span><button className="fullscreen-button" onClick={toggleFullscreen} aria-label={isFullscreen ? "Exit fullscreen" : "Enter fullscreen"}>{isFullscreen ? "EXIT FULLSCREEN ↙" : "FULLSCREEN ↗"}</button></span></div>
         <div className="board-grid">
@@ -182,7 +214,7 @@ export function App() {
             <div className="center-status">{current.name} · {roleName(current.role)} · {money(current.cash)}</div>
           </div>
         </div>
-        {activeEvent && <div className={`board-event-popup event-popup-${activeEvent.kind}`} role="status" aria-live="polite" key={activeEvent.id}>
+        {showEventPopups && activeEvent && <div className={`board-event-popup event-popup-${activeEvent.kind}`} role="status" aria-live="polite" key={activeEvent.id}>
           <span className="board-event-kicker">OFFICIAL RECORD · EVENT {String(activeEvent.id).padStart(3, "0")}</span>
           <p>{activeEvent.message}</p>
           <button type="button" aria-label="Dismiss event" onClick={() => setActiveEvent(null)}>DISMISS ×</button>
