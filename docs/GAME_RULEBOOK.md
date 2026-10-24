@@ -38,7 +38,7 @@ Citizen on another Citizen's property pays normal development-adjusted rent. Cit
 - Optional Citizen contributions are automatically skipped for the human player (to avoid silently spending their cash without a choice); AI Citizens contribute only when they can afford the amount. The human receives an event-log explanation. This is a temporary interaction rule until explicit card-choice UI is added.
 - Conditional public-fund collections pay only the available amount; any shortfall is waived rather than carried as hidden debt. Conditional public payments are skipped when the public-fund condition is not met.
 - Payments first use available cash, then automatically mortgage the debtor's unmortgaged owned properties at half purchase price. If the bill still cannot be paid, the debtor is declared bankrupt, remaining cash is set to zero, owned property is transferred according to the current rule (Citizen assets go to the Politician; Politician assets go to the named creditor where applicable), and the player's leases are cleared.
-- Bankruptcy ends the game if the Politician goes bankrupt (Citizens win) or when two Citizens go bankrupt (Politician wins). This milestone does not yet implement the separate cooperative Citizen victory condition or mortgage redemption.
+- Bankruptcy ends the game if the Politician goes bankrupt (Citizens win) or when two Citizens go bankrupt (Politician wins). The cooperative Citizen victory condition is implemented in initial form as described below; mortgage redemption remains deferred.
 - The event log records card draws, payments, mortgage actions, bankruptcy, and skip-turn effects. The board UI shows deck draw counts and a game-over message.
 
 ## Housing (later phase)
@@ -61,7 +61,7 @@ Citizens can contribute ৳100 or ৳500 through the UI to a separate fund; the 
 
 **Politician wins** if any trigger occurs:
 1. Controls at least 7 properties, including active Politician leases.
-2. Reaches ৳8,000 defined personal wealth (asset valuation is an open decision).
+2. Reaches ৳8,000 in cash plus the listed purchase value of individually owned property (leases and liabilities are not included in this provisional calculation).
 3. Two Citizens go bankrupt.
 
 **Citizens win together** only if all are true:
