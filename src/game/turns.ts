@@ -33,25 +33,23 @@ export function runAiTurn(state: GameState, random: RandomSource = Math.random):
   if (player.controller !== "ai" || state.phase !== "awaiting-roll") return state;
   let next = rollAndMove(state, random);
   if (next.pendingPropertyId) {
-    const action = chooseAiPropertyAction(next);
-    const rationale = action === "lease"
-      ? "chose the lower-cost lease to preserve cash and secure control."
-      : action === "buy"
-        ? "bought the property while keeping a cash reserve."
-        : "declined the property to preserve available cash.";
-    next = { ...next, nextEventId: next.nextEventId + 1, events: [...next.events, {
-      id: next.nextEventId, kind: "ai" as const, message: player.name + " " + rationale,
-    }].slice(-100) };
-    next = resolvePropertyAction(next, action);
+    const space = awaitBoardSpace(next.pendingPropertyId);
+    if (player.role === "citizen" && space?.price !== undefined && next.cooperativeFund >= space.price && next.charterPendingRound === null) {
+      next = buyCooperativeProperty(next, player.id);
+    } else {
+      const action = chooseAiPropertyAction(next);
+      const rationale = action === "lease"
+        ? "chose the lower-cost lease to preserve cash and secure control."
+        : action === "buy"
+          ? "bought the property while keeping a cash reserve."
+          : "declined the property to preserve available cash.";
+      next = { ...next, nextEventId: next.nextEventId + 1, events: [...next.events, {
+        id: next.nextEventId, kind: "ai" as const, message: player.name + " " + rationale,
+      }].slice(-100) };
+      next = resolvePropertyAction(next, action);
+    }
   }
   if (player.role === "citizen" && !player.bankrupt && next.phase !== "game-over") {
-    if (next.pendingPropertyId) {
-      const pending = next.pendingPropertyId;
-      const space = (awaitBoardSpace(pending));
-      if (space?.price !== undefined && next.cooperativeFund >= space.price && next.charterPendingRound === null) {
-        next = buyCooperativeProperty(next, player.id);
-      }
-    }
     const currentCitizen = next.players.find((p) => p.id === player.id);
     if (currentCitizen && currentCitizen.cash >= 1_200 && next.cooperativeFund < 1_000 && next.charterPendingRound === null) {
       next = contributeToCooperative(next, player.id, Math.min(100, currentCitizen.cash - 1_000));
@@ -60,6 +58,7 @@ export function runAiTurn(state: GameState, random: RandomSource = Math.random):
       next = voteForCharter(next, player.id);
     }
   }
+  if (next.phase === "game-over") return next;
   return endTurn(next);
 }
 function awaitBoardSpace(spaceId: string) {
