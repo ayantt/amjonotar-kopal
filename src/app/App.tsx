@@ -79,6 +79,7 @@ export function App() {
     <section className="game-intro"><div><p className="eyebrow">THE PEOPLE PAY. THE POWERFUL PLAY.</p><h1>The board is <em>rigged.</em></h1></div><p>{busy ? "The computer is making its move…" : lastAction}</p></section>
     {game.phase === "game-over" && <section className="game-over-panel"><strong>GAME OVER</strong><p>{game.winner === "politician" ? "The Politician wins by consolidating power, wealth, or through Citizen bankruptcies." : game.winner === "citizens" ? (game.charterActivated ? "The Citizens held the People's Charter and win together." : "The Politician has gone bankrupt. The Citizens win together.") : "The game has ended."}</p><button className="primary-action" onClick={restart}>Start a new game ↗</button></section>}
     <section className="game-layout">
+    <section className="panel log-panel"><div className="panel-label">THE OFFICIAL RECORD <span>RECENT EVENTS</span></div><div className="event-list">{[...game.events].reverse().slice(0,8).map((event) => <div className={`event event-${event.kind}`} key={event.id}><span>{String(event.id).padStart(3,"0")}</span><p>{event.message}</p></div>)}</div></section>
       <div className="board-wrap">
         <div className="board-heading"><span>THE REPUBLIC OF OPPORTUNITY</span><span>40 SPACES</span></div>
         <div className="board-grid">
@@ -126,7 +127,6 @@ export function App() {
           </div>}<div className="fund-row"><span>Community cards drawn</span><strong>{game.cardDrawCounts.community}/16</strong></div><div className="fund-row"><span>Chance cards drawn</span><strong>{game.cardDrawCounts.chance}/16</strong></div></section>
       </aside>
     </section>
-    <section className="panel log-panel"><div className="panel-label">THE OFFICIAL RECORD <span>RECENT EVENTS</span></div><div className="event-list">{[...game.events].reverse().slice(0,8).map((event) => <div className={`event event-${event.kind}`} key={event.id}><span>{String(event.id).padStart(3,"0")}</span><p>{event.message}</p></div>)}</div></section>
     <footer className="site-footer"><span>FICTIONAL POLITICAL SATIRE · NOT A SIMULATION OF ANY SPECIFIC PERSON</span><button onClick={restart}>NEW GAME ↗</button></footer>
   </main>;
 }
