@@ -210,3 +210,34 @@
 .game-shell:fullscreen .game-intro{display:none}
 
 .game-shell:fullscreen .site-footer{display:none}
+
+
+/* Clickable board properties and their detail dialog. */
+.space-clickable{cursor:pointer;transition:filter .12s ease,box-shadow .12s ease}
+.space-clickable:hover,.space-clickable:focus-visible{filter:brightness(1.08);box-shadow:inset 0 0 0 2px var(--red);outline:none;z-index:2}
+.property-modal-backdrop{position:fixed;inset:0;z-index:1100;display:flex;align-items:center;justify-content:center;padding:1rem;background:rgba(25,27,22,.74);backdrop-filter:blur(3px)}
+.property-modal{display:flex;flex-direction:column;width:min(620px,100%);max-height:min(88vh,760px);overflow:hidden;background:#f5efdf;color:#25251f;border:1px solid #9d8c6d;box-shadow:0 20px 80px rgba(0,0,0,.38)}
+.property-modal-header{display:flex;align-items:flex-start;justify-content:space-between;gap:1rem;padding:1.3rem 1.5rem;background:#e8ddc7;border-bottom:5px solid #c7b99d}
+.property-modal-header.color-brown{border-bottom-color:#8b6247}
+.property-modal-header.color-light-blue{border-bottom-color:#8fc4d5}
+.property-modal-header.color-pink{border-bottom-color:#c8789c}
+.property-modal-header.color-orange{border-bottom-color:#d98b48}
+.property-modal-header.color-red{border-bottom-color:#b94c42}
+.property-modal-header.color-yellow{border-bottom-color:#d6bd4d}
+.property-modal-header.color-green{border-bottom-color:#66966a}
+.property-modal-header.color-dark-blue{border-bottom-color:#536a9c}
+.property-modal-kicker{font-size:.58rem;font-weight:900;letter-spacing:.13em;color:#716751}
+.property-modal-header h2{font-family:Georgia,"Noto Serif Bengali",serif;font-size:clamp(1.8rem,5vw,2.8rem);line-height:1.05;margin:.45rem 0 .3rem}
+.property-modal-header p{margin:0;color:#6d6250;font-family:Georgia,"Noto Serif Bengali",serif;font-size:.9rem}
+.property-modal-body{padding:1.3rem 1.5rem;overflow-y:auto}
+.property-detail-grid{display:grid;grid-template-columns:1fr 1fr;gap:.65rem}
+.property-detail{display:flex;flex-direction:column;gap:.35rem;padding:.8rem;background:#eee5d2;border:1px solid #d8cebb;min-width:0}
+.property-detail span,.property-detail-status>span{font-size:.58rem;font-weight:900;letter-spacing:.1em;color:#716751}
+.property-detail strong{font-family:Georgia,"Noto Serif Bengali",serif;font-size:1.05rem;overflow-wrap:anywhere}
+.property-detail-status{display:flex;flex-direction:column;gap:.35rem;margin-top:.7rem;padding:.8rem;border:1px solid #c7b99d}
+.property-detail-status strong{font-size:.9rem;line-height:1.45}
+.property-detail-note{margin:.8rem 0 0;color:#625c50;font-size:.8rem;line-height:1.6}
+.property-modal-footer{display:flex;align-items:center;justify-content:space-between;gap:.8rem;padding:.9rem 1.5rem;border-top:3px double #aa9b7f;background:#e8ddc7}
+.property-modal-footer>span{font-size:.55rem;font-weight:900;letter-spacing:.08em;color:#716751}
+.property-modal-footer .primary-action{width:auto;max-width:100%;font-size:.62rem;padding:.7rem .8rem}
+@media(max-width:580px){.property-modal-backdrop{padding:.4rem}.property-modal-header{padding:1rem}.property-modal-body{padding:1rem}.property-detail{padding:.65rem}.property-detail strong{font-size:.9rem}.property-modal-footer{align-items:flex-start;flex-direction:column;padding:.8rem 1rem}}
