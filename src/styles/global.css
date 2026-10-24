@@ -108,3 +108,11 @@
   .game-layout>.log-panel{height:auto;max-height:420px}
   .game-layout>.log-panel .event-list{max-height:340px;overflow-y:auto}
 }
+
+/* Keep the event record locked to the board's grid-row height on desktop. */
+@media(min-width:1101px){
+  .game-layout{align-items:stretch}
+  .game-layout>.board-wrap{align-self:stretch;min-height:0}
+  .game-layout>.log-panel{align-self:stretch;height:auto;min-height:0;max-height:none;overflow:hidden}
+  .game-layout>.log-panel .event-list{flex:1 1 0;height:0;min-height:0;max-height:none;overflow-y:auto}
+}
