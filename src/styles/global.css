@@ -55,3 +55,40 @@
   .game-layout>.sidebar .current-panel{grid-row:auto}
   .game-layout>.log-panel .event-list{grid-template-columns:minmax(0,1fr)}
 }
+
+
+/* In-game Constitution / rule book */
+.header-actions{display:flex;align-items:center;gap:.55rem}
+.constitution-button{display:flex;align-items:center;gap:.55rem;border:1px solid var(--ink);background:#e5d5b8;padding:.55rem .75rem;font-weight:900;font-family:Georgia,"Noto Serif Bengali",serif}
+.constitution-button span{font:800 .55rem Inter,system-ui,sans-serif;letter-spacing:.08em;color:#766b59}
+.constitution-backdrop{position:fixed;inset:0;z-index:1000;display:flex;align-items:center;justify-content:center;padding:1rem;background:rgba(25,27,22,.72);backdrop-filter:blur(3px)}
+.constitution-modal{display:flex;flex-direction:column;width:min(900px,100%);max-height:min(90vh,1000px);overflow:hidden;background:#f5efdf;color:#25251f;border:1px solid #9d8c6d;box-shadow:0 20px 80px rgba(0,0,0,.35)}
+.constitution-header{display:flex;justify-content:space-between;align-items:flex-start;gap:1rem;padding:1.4rem clamp(1rem,4vw,2.5rem);background:#e8ddc7;border-bottom:3px double #aa9b7f}
+.constitution-kicker{font-size:.58rem;font-weight:900;letter-spacing:.14em;color:#716751;margin:0 0 .5rem}
+.constitution-header h2{font-family:Georgia,"Noto Serif Bengali",serif;font-size:clamp(2.4rem,6vw,4rem);line-height:1;margin:0;letter-spacing:-.04em}
+.constitution-subtitle{font-family:Georgia,serif;font-style:italic;color:#6d6250;margin:.4rem 0 0}
+.constitution-close{flex-shrink:0;background:transparent;border:1px solid #9d8c6d;padding:.55rem .7rem;font-size:.65rem;font-weight:900;letter-spacing:.08em}
+.constitution-preamble{margin:1rem clamp(1rem,4vw,2.5rem) 0;padding:1rem 1.2rem;border:1px solid #c7b99d;background:#eee5d2}
+.constitution-preamble>strong{font-size:.65rem;letter-spacing:.12em}
+.constitution-preamble p{font-family:Georgia,"Noto Serif Bengali",serif;font-size:.9rem;line-height:1.7;margin:.55rem 0 0}
+.constitution-body{padding:.3rem clamp(1rem,4vw,2.5rem) 1rem;overflow-y:auto}
+.constitution-body article{padding:1.1rem 0;border-bottom:1px solid #d8cebb}
+.article-number{font-size:.6rem;font-weight:950;letter-spacing:.15em;color:#a44735}
+.constitution-body h3{font-family:Georgia,"Noto Serif Bengali",serif;font-size:1.15rem;margin:.25rem 0 .6rem}
+.constitution-body p{font-family:Georgia,"Noto Serif Bengali",serif;font-size:.86rem;line-height:1.7;color:#45443b;margin:.45rem 0}
+.constitution-body p b{font-family:Inter,system-ui,sans-serif;font-size:.75rem}
+.constitution-footer{display:flex;align-items:center;justify-content:space-between;gap:1rem;padding:1rem clamp(1rem,4vw,2.5rem);border-top:3px double #aa9b7f;background:#e8ddc7}
+.constitution-footer>span{font-size:.56rem;font-weight:900;letter-spacing:.1em;color:#716751}
+.constitution-footer .primary-action{width:auto;max-width:100%;font-size:.65rem;padding:.7rem .8rem}
+@media(max-width:580px){
+  .game-header .header-actions{gap:.3rem}
+  .constitution-button{display:grid;gap:.1rem;padding:.45rem;font-size:.8rem}
+  .constitution-button span{font-size:.43rem}
+  .constitution-backdrop{padding:.35rem}
+  .constitution-modal{max-height:94vh}
+  .constitution-header{padding:1rem}
+  .constitution-preamble{margin:.7rem .8rem 0;padding:.8rem}
+  .constitution-body{padding:0 .9rem .8rem}
+  .constitution-body article{padding:.85rem 0}
+  .constitution-footer{align-items:flex-start;flex-direction:column;padding:.8rem 1rem}
+}
