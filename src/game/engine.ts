@@ -16,7 +16,7 @@ export function createNewGame({ humanRole }: NewGameOptions): GameState {
   const humanIndex = humanRole === "politician" ? 0 : 1;
   const names = ["The Honourable Leader", "Asha", "Rafi", "Mina"];
   const players = roles.map((role, index) => makePlayer(`player-${index + 1}`, index === humanIndex ? "You" : (role === "politician" ? "The Honourable Leader" : names[index]), role, index === humanIndex ? "human" : "ai"));
-  const initial: GameState = { schemaVersion: 1, phase: "awaiting-roll", players, currentPlayerIndex: 0, publicFund: 0, cooperativeFund: 0, properties: createPropertyLedger(), pendingPropertyId: null, cardDrawCounts: { community: 0, chance: 0 }, extraRollAvailable: false, events: [], nextEventId: 1, round: 1, winner: null };
+  const initial: GameState = { schemaVersion: 1, phase: "awaiting-roll", players, currentPlayerIndex: 0, publicFund: 0, cooperativeFund: 0, properties: createPropertyLedger(), cooperativePropertyIds: [], charterVotes: [], charterPendingRound: null, charterActivated: false, pendingPropertyId: null, cardDrawCounts: { community: 0, chance: 0 }, extraRollAvailable: false, events: [], nextEventId: 1, round: 1, winner: null };
   const state = addEvent(initial, `Game started. You play as ${humanRole === "politician" ? "Politician" : "Citizen"}; three opponents are computer-controlled.`);
   return addEvent(state, `The board has ${BOARD_SPACE_COUNT} spaces. All players begin at Shurur Line.`);
 }
