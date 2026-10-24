@@ -377,6 +377,7 @@ export function sellProperty(state: GameState, sellerId: string, spaceId: string
   }
   if (!space?.price || !property || property.ownerId !== sellerId) throw new Error("You can only sell property that you own.");
   if (property.leaseholderId) throw new Error("A property with an active lease cannot be sold.");
+  if (property.mortgaged) throw new Error("A mortgaged property cannot be sold.");
   if (state.cooperativePropertyIds.includes(spaceId)) throw new Error("Cooperative property cannot be sold by an individual player.");
   const price = space.price;
   const politician = state.players.find((player) => player.role === "politician");
