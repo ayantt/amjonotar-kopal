@@ -17,7 +17,7 @@ Track unresolved conflicts here. When resolving one, update the rulebook/catalog
 - RD-012: AI decisions are bounded, validated, and logged in concise user-facing language.
 
 ## Open decisions
-- **RD-101 Politician wealth:** Is ৳8,000 cash or net worth? Provisional: cash + documented asset valuation − liabilities. Resolve before victory coding.
+- **RD-101 Politician wealth — provisional implementation:** ৳8,000 is cash plus listed purchase value of individually owned properties; leases and liabilities are excluded until balancing review.
 - **RD-102 Leases in Citizen property count:** Provisional: only owned and cooperative properties count, not leased property.
 - **RD-103 Public fund shortfall — resolved for Phase 3:** “If available” collections transfer only the available balance; shortfalls are waived, not carried as hidden liabilities. Revisit if explicit debt instruments are added.
 - **RD-104 Lease rent:** Provisional: active leaseholder alone collects rent; owner does not also collect.
@@ -41,3 +41,5 @@ Never silently invent behavior for unresolved rules. Mark decision resolved, rec
 - RD-116: Cooperative properties are tracked separately from individual owners; rent is paid into the cooperative fund.
 - RD-117: Charter activation requires a majority of active Citizen votes and at least ৳1,000 in the cooperative fund. The fund and victory thresholds are checked at the next Citizen round.
 - RD-118: Politician victory checks are evaluated after movement/property actions and at turn advancement: seven controlled properties, ৳8,000 cash plus owned-property value, or two bankrupt Citizens.
+
+- RD-119: Cooperative property purchases can currently be made by the current Citizen when the fund covers the price; a separate majority spending vote is deferred to avoid blocking the MVP. Charter activation still requires a majority vote.
