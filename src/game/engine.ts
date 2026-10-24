@@ -1,5 +1,6 @@
 import { BOARD, BOARD_SPACE_COUNT } from "./board";
 import { GAME_RULES } from "./rules";
+import { CARD_DECKS, drawCard, type CardEffect } from "./cards";
 import { countRailroads, createPropertyLedger, getBaseRent, getLegalPropertyActions, isPurchasable, type PropertyAction } from "./properties";
 import type { Controller, GameEvent, GameState, NewGameOptions, Player, PlayerRole } from "./types";
 
@@ -8,14 +9,14 @@ function addEvent(state: GameState, message: string, kind: GameEvent["kind"] = "
   return { ...state, nextEventId: state.nextEventId + 1, events: [...state.events, { id: state.nextEventId, message, kind }].slice(-100) };
 }
 function makePlayer(id: string, name: string, role: PlayerRole, controller: Controller): Player {
-  return { id, name, role, controller, cash: role === "politician" ? GAME_RULES.politicianStartingCash : GAME_RULES.citizenStartingCash, position: 0, active: true, lastRoll: [], goPasses: 0, bankrupt: false };
+  return { id, name, role, controller, cash: role === "politician" ? GAME_RULES.politicianStartingCash : GAME_RULES.citizenStartingCash, position: 0, active: true, lastRoll: [], goPasses: 0, bankrupt: false, skipTurns: 0 };
 }
 export function createNewGame({ humanRole }: NewGameOptions): GameState {
   const roles: PlayerRole[] = ["politician", "citizen", "citizen", "citizen"];
   const humanIndex = humanRole === "politician" ? 0 : 1;
   const names = ["The Honourable Leader", "Asha", "Rafi", "Mina"];
   const players = roles.map((role, index) => makePlayer(`player-${index + 1}`, index === humanIndex ? "You" : (role === "politician" ? "The Honourable Leader" : names[index]), role, index === humanIndex ? "human" : "ai"));
-  const initial: GameState = { schemaVersion: 1, phase: "awaiting-roll", players, currentPlayerIndex: 0, publicFund: 0, cooperativeFund: 0, properties: createPropertyLedger(), pendingPropertyId: null, events: [], nextEventId: 1, round: 1, winner: null };
+  const initial: GameState = { schemaVersion: 1, phase: "awaiting-roll", players, currentPlayerIndex: 0, publicFund: 0, cooperativeFund: 0, properties: createPropertyLedger(), pendingPropertyId: null, cardDrawCounts: { community: 0, chance: 0 }, extraRollAvailable: false, events: [], nextEventId: 1, round: 1, winner: null };
   const state = addEvent(initial, `Game started. You play as ${humanRole === "politician" ? "Politician" : "Citizen"}; three opponents are computer-controlled.`);
   return addEvent(state, `The board has ${BOARD_SPACE_COUNT} spaces. All players begin at Shurur Line.`);
 }
@@ -31,13 +32,55 @@ export function getDiceCount(player: Player): number { return player.role === "p
 function pay(state: GameState, payerId: string, recipientId: string | null, amount: number, reason: string): GameState {
   if (amount <= 0) return state;
   const payer = state.players.find((p) => p.id === payerId);
-  if (!payer) return state;
-  const actual = Math.min(payer.cash, amount);
-  let next: GameState = { ...state, players: state.players.map((p) => p.id === payerId ? { ...p, cash: p.cash - actual } : p) };
-  if (recipientId) next = { ...next, players: next.players.map((p) => p.id === recipientId ? { ...p, cash: p.cash + actual } : p) };
-  else next = { ...next, publicFund: next.publicFund + actual };
-  next = addEvent(next, `${payer.name} paid ৳${actual} for ${reason}.`, "money");
-  if (actual < amount) next = addEvent(next, `Debt warning: ${payer.name} could not cover ৳${amount - actual} of the ${reason} payment. Debt resolution is not implemented yet.`);
+  if (!payer || payer.bankrupt) return state;
+  let next = state;
+  let remaining = amount;
+  // First use cash, then automatically mortgage owned properties at half purchase price.
+  const cashPaid = Math.min(payer.cash, remaining);
+  if (cashPaid > 0) {
+    next = { ...next, players: next.players.map((p) => p.id === payerId ? { ...p, cash: p.cash - cashPaid } : p) };
+    remaining -= cashPaid;
+  }
+  if (remaining > 0) {
+    const assets = Object.values(next.properties).filter((property) => property.ownerId === payerId && !property.mortgaged);
+    for (const asset of assets) {
+      if (remaining <= 0) break;
+      const space = BOARD.find((s) => s.id === asset.spaceId);
+      const proceeds = Math.floor((space?.price ?? 0) / 2);
+      if (proceeds <= 0) continue;
+      const raised = Math.min(proceeds, remaining);
+      next = { ...next, properties: { ...next.properties, [asset.spaceId]: { ...asset, mortgaged: true } },
+        players: next.players.map((p) => p.id === payerId ? { ...p, cash: p.cash + proceeds } : p) };
+      next = addEvent(next, `${payer.name} mortgaged ${space?.name ?? asset.spaceId} for ৳${proceeds} to cover ${reason}.`, "money");
+      const paidFromMortgage = Math.min(proceeds, remaining);
+      next = { ...next, players: next.players.map((p) => p.id === payerId ? { ...p, cash: p.cash - paidFromMortgage } : p) };
+      remaining -= paidFromMortgage;
+      if (raised < proceeds) {
+        const excess = proceeds - paidFromMortgage;
+        next = { ...next, players: next.players.map((p) => p.id === payerId ? { ...p, cash: p.cash + excess } : p) };
+      }
+    }
+  }
+  const paid = amount - remaining;
+  if (recipientId) next = { ...next, players: next.players.map((p) => p.id === recipientId ? { ...p, cash: p.cash + paid } : p) };
+  else next = { ...next, publicFund: next.publicFund + paid };
+  next = addEvent(next, `${payer.name} paid ৳${paid} of ৳${amount} for ${reason}.`, "money");
+  if (remaining > 0) {
+    const beneficiary = recipientId ? next.players.find((p) => p.id === recipientId) : undefined;
+    const isCitizen = payer.role === "citizen";
+    const politicianId = next.players.find((p) => p.role === "politician")?.id ?? null;
+    const assetRecipient = isCitizen ? politicianId : recipientId;
+    next = { ...next, players: next.players.map((p) => p.id === payerId ? { ...p, cash: 0, bankrupt: true, active: false } : p),
+      properties: Object.fromEntries(Object.entries(next.properties).map(([id, property]) => property.ownerId === payerId
+        ? [id, { ...property, ownerId: assetRecipient, leaseholderId: null, leaseExpiresAtGoPass: null, mortgaged: false }]
+        : property.leaseholderId === payerId ? [id, { ...property, leaseholderId: null, leaseExpiresAtGoPass: null }] : [id, property])) };
+    next = addEvent(next, `${payer.name} could not pay the remaining ৳${remaining} and went bankrupt. Assets were transferred under the current bankruptcy rule.`);
+    if (next.players.filter((p) => p.active && p.role === "citizen").length === 0) {
+      next = { ...next, phase: "game-over", winner: "politician" };
+      next = addEvent(next, "All Citizens are bankrupt. The Politician wins.");
+    }
+    void beneficiary;
+  }
   return next;
 }
 function resolveOwnedSpace(state: GameState, player: Player, spaceId: string): GameState {
