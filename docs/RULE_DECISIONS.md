@@ -4,14 +4,17 @@ Track unresolved conflicts here. When resolving one, update the rulebook/catalog
 
 ## Locked
 - RD-001: exactly one Politician and three Citizens.
-- RD-002: local pass-and-play MVP.
-- RD-003: Politician privilege intentional; Citizen victory cooperative.
-- RD-004: fictional composites only.
-- RD-005: integer taka; public and cooperative funds separate.
-- RD-006: engine validates every action.
-- RD-007: no building on another player's property; permit mechanic deferred.
-- RD-008: declined properties remain unowned; no auction in MVP.
-- RD-009: no backend/auth/multiplayer in MVP.
+- RD-002: single-player; one human against three local AI opponents; no pass-and-play.
+- RD-003: human chooses a role; remaining seats are assigned to AI while preserving one Politician and three Citizens.
+- RD-004: Politician privilege intentional; Citizen victory cooperative.
+- RD-005: fictional composites only.
+- RD-006: integer taka; public and cooperative funds separate.
+- RD-007: engine validates every action; AI chooses only from legal actions.
+- RD-008: no building on another player's property; permit mechanic deferred.
+- RD-009: declined properties remain unowned; no auction in MVP.
+- RD-010: no backend/auth/multiplayer/remote AI service in MVP.
+- RD-011: AI receives only player-appropriate information; no cheating or hidden-state access.
+- RD-012: AI decisions are bounded, validated, and logged in concise user-facing language.
 
 ## Open decisions
 - **RD-101 Politician wealth:** Is ৳8,000 cash or net worth? Provisional: cash + documented asset valuation − liabilities. Resolve before victory coding.
