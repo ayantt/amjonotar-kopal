@@ -5,11 +5,52 @@ import { runAiTurn } from "../game/turns";
 import { getBaseRent, getLegalPropertyActions } from "../game/properties";
 import type { GameState, PlayerRole } from "../game/types";
 
+
+type SoundName = "start" | "roll" | "turn" | "money" | "event" | "victory";
+let sharedAudioContext: AudioContext | null = null;
+
+function playSound(name: SoundName, enabled: boolean) {
+  if (!enabled || typeof window === "undefined") return;
+  const AudioContextClass = window.AudioContext;
+  if (!AudioContextClass) return;
+  try {
+    const context = sharedAudioContext ?? (sharedAudioContext = new AudioContextClass());
+    if (context.state === "suspended") void context.resume();
+    const now = context.currentTime;
+    const patterns: Record<SoundName, Array<{ frequency: number; duration: number; wave?: OscillatorType; delay?: number }>> = {
+      start: [{ frequency: 440, duration: 0.09 }, { frequency: 587.33, duration: 0.13, delay: 0.08 }],
+      roll: [{ frequency: 190, duration: 0.045, wave: "square" }, { frequency: 270, duration: 0.045, wave: "square", delay: 0.055 }, { frequency: 360, duration: 0.06, wave: "triangle", delay: 0.11 }],
+      turn: [{ frequency: 330, duration: 0.07 }, { frequency: 247, duration: 0.1, delay: 0.07 }],
+      money: [{ frequency: 660, duration: 0.07 }, { frequency: 880, duration: 0.11, delay: 0.065 }],
+      event: [{ frequency: 520, duration: 0.08, wave: "triangle" }],
+      victory: [{ frequency: 523.25, duration: 0.12 }, { frequency: 659.25, duration: 0.12, delay: 0.1 }, { frequency: 783.99, duration: 0.2, delay: 0.2 }],
+    };
+    patterns[name].forEach(({ frequency, duration, wave = "sine", delay = 0 }) => {
+      const oscillator = context.createOscillator();
+      const gain = context.createGain();
+      const startAt = now + delay;
+      oscillator.type = wave;
+      oscillator.frequency.setValueAtTime(frequency, startAt);
+      gain.gain.setValueAtTime(0.0001, startAt);
+      gain.gain.exponentialRampToValueAtTime(0.09, startAt + 0.012);
+      gain.gain.exponentialRampToValueAtTime(0.0001, startAt + duration);
+      oscillator.connect(gain);
+      gain.connect(context.destination);
+      oscillator.start(startAt);
+      oscillator.stop(startAt + duration + 0.015);
+    });
+  } catch {
+    // Audio restrictions must never interrupt gameplay.
+  }
+}
+
 const money = (amount: number) => `৳${amount.toLocaleString("en-BD")}`;
 const roleName = (role: PlayerRole) => role === "politician" ? "Politician" : "Citizen";
 export function App() {
   const [game, setGame] = useState<GameState | null>(null);
   const [busy, setBusy] = useState(false);
+  const [soundEnabled, setSoundEnabled] = useState(true);
+  const victorySoundPlayed = useRef(false);
   const [lastAction, setLastAction] = useState("Choose your role to start a new game.");
   const [showConstitution, setShowConstitution] = useState(false);
   const [selectedPropertyId, setSelectedPropertyId] = useState<string | null>(null);
@@ -75,18 +116,29 @@ export function App() {
 
   useEffect(() => {
     if (!activeEvent || !showEventPopups) return;
+    playSound(activeEvent.kind === "money" ? "money" : activeEvent.kind === "ai" ? "event" : "turn", soundEnabled);
     setDisplayedEvents((events) => events.some((event) => event.id === activeEvent.id)
       ? events
       : [...events, activeEvent as GameState["events"][number]]);
     const timer = window.setTimeout(() => setActiveEvent(null), 2600);
     return () => window.clearTimeout(timer);
-  }, [activeEvent, showEventPopups]);
+  }, [activeEvent, showEventPopups, soundEnabled]);
+
+  useEffect(() => {
+    if (game?.phase === "game-over" && !victorySoundPlayed.current) {
+      victorySoundPlayed.current = true;
+      playSound("victory", soundEnabled);
+    }
+    if (!game || game.phase !== "game-over") victorySoundPlayed.current = false;
+  }, [game?.phase, soundEnabled]);
 
 
   function startGame(role: PlayerRole) {
     const next = createNewGame({ humanRole: role });
     if (!validateSetup(next)) throw new Error("Invalid four-player setup.");
     setGame(next);
+    playSound("start", soundEnabled);
+    victorySoundPlayed.current = false;
     lastSeenEventId.current = null;
     setDisplayedEvents([]);
     setEventQueue([]);
@@ -98,6 +150,7 @@ export function App() {
     if (!game || !isHumanTurn(game) || game.phase !== "awaiting-roll") return;
     const next = rollAndMove(game);
     setGame(next);
+    playSound("roll", soundEnabled);
     const player = getCurrentPlayer(game);
     const landed = BOARD[next.players[game.currentPlayerIndex].position];
     setLastAction(`You rolled ${player.role === "politician" ? "two dice" : "one die"} and landed on ${landed.name}.`);
@@ -105,6 +158,7 @@ export function App() {
   function finishTurn() {
     if (!game || !isHumanTurn(game) || game.phase !== "awaiting-end-turn") return;
     setGame(endTurn(game));
+    playSound("turn", soundEnabled);
     setLastAction("Your turn ended. The computer opponents will play automatically.");
   }
   async function toggleFullscreen() {
@@ -150,7 +204,7 @@ export function App() {
     <header className="game-header">
       <button className="wordmark" onClick={restart} aria-label="Return to role selection">আমজনতার কপাল<span>BACK TO MENU ↗</span></button>
       <div className="turn-pill"><span className={current.controller === "human" ? "pulse-dot" : "pulse-dot ai-dot"} />{current.controller === "human" ? "YOUR TURN" : "COMPUTER TURN"} · ROUND {game.round}</div>
-      <div className="header-actions"><button className="constitution-button" onClick={() => setShowConstitution(true)}>সংবিধান <span>RULE BOOK ↗</span></button><button className="reset-button" onClick={restart}>Restart ↻</button></div>
+      <div className="header-actions"><button className={`sound-toggle ${soundEnabled ? "is-on" : ""}`} type="button" aria-pressed={soundEnabled} aria-label={soundEnabled ? "Mute sound effects" : "Enable sound effects"} onClick={() => setSoundEnabled((enabled) => !enabled)}>{soundEnabled ? "SOUND ON ♪" : "SOUND OFF ♫"}</button><button className="constitution-button" onClick={() => setShowConstitution(true)}>সংবিধান <span>RULE BOOK ↗</span></button><button className="reset-button" onClick={restart}>Restart ↻</button></div>
     </header>
     {showConstitution && <div className="constitution-backdrop" role="presentation" onClick={() => setShowConstitution(false)}>
       <section className="constitution-modal" role="dialog" aria-modal="true" aria-labelledby="constitution-title" onClick={(event) => event.stopPropagation()}>
@@ -219,7 +273,7 @@ export function App() {
       </div>
       <aside className="sidebar">
         <section className="panel current-panel"><div className="panel-label">NOW PLAYING</div><div className="current-player"><span className={`large-token ${current.role} player-color-${current.id}`}>{current.controller === "human" ? "YOU" : current.role === "politician" ? "P" : current.name.slice(0,1)}</span><div><h2>{current.name}</h2><p>{roleName(current.role)} · {current.controller === "human" ? "Human player" : "Computer opponent"}</p></div></div><div className="cash-line"><span>AVAILABLE CASH</span><strong>{money(current.cash)}</strong></div>
-          {current.controller === "human" && game.pendingPropertyId && <div className="property-decision"><div className="panel-label">PROPERTY DECISION</div><strong>{BOARD.find((space) => space.id === game.pendingPropertyId)?.name}</strong><p>Choose what to do with this unclaimed space.</p>{propertyActions.map((action) => <button className={action.type === "decline" ? "secondary-action" : "primary-action"} key={action.type} onClick={() => setGame((state) => state ? resolvePropertyAction(state, action.type) : state)}>{action.label}<span>{action.type === "decline" ? "↷" : money(action.cost)}</span></button>)}{current.role === "citizen" && game.charterPendingRound === null && game.cooperativeFund >= (BOARD.find((space) => space.id === game.pendingPropertyId)?.price ?? Infinity) && <button className="secondary-action" onClick={() => setGame((state) => state ? buyCooperativeProperty(state, current.id) : state)}>Buy for Citizens co-op <span>{money(BOARD.find((space) => space.id === game.pendingPropertyId)?.price ?? 0)}</span></button>}</div>}
+          {current.controller === "human" && game.pendingPropertyId && <div className="property-decision"><div className="panel-label">PROPERTY DECISION</div><strong>{BOARD.find((space) => space.id === game.pendingPropertyId)?.name}</strong><p>Choose what to do with this unclaimed space.</p>{propertyActions.map((action) => <button className={action.type === "decline" ? "secondary-action" : "primary-action"} key={action.type} onClick={() => { setGame((state) => state ? resolvePropertyAction(state, action.type) : state); playSound(action.type === "decline" ? "turn" : "money", soundEnabled); }}>{action.label}<span>{action.type === "decline" ? "↷" : money(action.cost)}</span></button>)}{current.role === "citizen" && game.charterPendingRound === null && game.cooperativeFund >= (BOARD.find((space) => space.id === game.pendingPropertyId)?.price ?? Infinity) && <button className="secondary-action" onClick={() => { setGame((state) => state ? buyCooperativeProperty(state, current.id) : state); playSound("money", soundEnabled); }}>Buy for Citizens co-op <span>{money(BOARD.find((space) => space.id === game.pendingPropertyId)?.price ?? 0)}</span></button>}</div>}
           {current.controller === "human" ? <div className="actions"><button className="primary-action" onClick={roll} disabled={busy || game.phase !== "awaiting-roll"}>Roll {current.role === "politician" ? "two dice" : "one die"} <span>↗</span></button><button className="secondary-action" onClick={finishTurn} disabled={busy || game.phase !== "awaiting-end-turn" || Boolean(game.pendingPropertyId)}>End turn →</button></div> : <p className="ai-note">{busy ? "Thinking through the next move…" : "Computer turn will begin shortly."}</p>}
         </section>
         <section className="panel players-panel"><div className="panel-label">THE FOUR SEATS</div>{game.players.map((player) => <div className={`player-row ${player.id === current.id ? "selected" : ""}`} key={player.id}><span className={`mini-token ${player.role} player-color-${player.id}`}>{player.controller === "human" ? "Y" : player.role === "politician" ? "P" : player.name.slice(0,1)}</span><div className="player-row-name"><strong>{player.name}</strong><small>{roleName(player.role)} · {player.controller === "human" ? "You" : "AI"}{player.bankrupt ? " · BANKRUPT" : ""}</small></div><strong className="player-cash">{money(player.cash)}</strong><small className="position-label">#{player.position}</small></div>)}</section>
@@ -227,10 +281,10 @@ export function App() {
           {current.controller === "human" && current.role === "citizen" && <div className="cooperative-actions">
             <div className="panel-label">ORGANIZE TOGETHER</div>
             <div className="cooperative-buttons">
-              <button className="secondary-action" disabled={current.cash < 100 || game.phase === "game-over"} onClick={() => setGame((state) => state ? contributeToCooperative(state, current.id, 100) : state)}>Contribute ৳100</button>
-              <button className="secondary-action" disabled={current.cash < 500 || game.phase === "game-over"} onClick={() => setGame((state) => state ? contributeToCooperative(state, current.id, 500) : state)}>Contribute ৳500</button>
+              <button className="secondary-action" disabled={current.cash < 100 || game.phase === "game-over"} onClick={() => { setGame((state) => state ? contributeToCooperative(state, current.id, 100) : state); playSound("money", soundEnabled); }}>Contribute ৳100</button>
+              <button className="secondary-action" disabled={current.cash < 500 || game.phase === "game-over"} onClick={() => { setGame((state) => state ? contributeToCooperative(state, current.id, 500) : state); playSound("money", soundEnabled); }}>Contribute ৳500</button>
             </div>
-            <button className="primary-action" disabled={game.charterPendingRound !== null || game.charterActivated || game.charterVotes.includes(current.id) || game.cooperativeFund < 1000} onClick={() => setGame((state) => state ? voteForCharter(state, current.id) : state)}>Vote for People's Charter <span>{game.charterVotes.length}/3</span></button>
+            <button className="primary-action" disabled={game.charterPendingRound !== null || game.charterActivated || game.charterVotes.includes(current.id) || game.cooperativeFund < 1000} onClick={() => { setGame((state) => state ? voteForCharter(state, current.id) : state); playSound("event", soundEnabled); }}>Vote for People's Charter <span>{game.charterVotes.length}/3</span></button>
             <small>{game.charterPendingRound !== null ? "Charter pending: preserve the fund and victory conditions until the next Citizen round." : "A majority vote and ৳1,000 cooperative fund are required to propose the Charter."}</small>
           </div>}<div className="fund-row"><span>Community cards drawn</span><strong>{game.cardDrawCounts.community}/16</strong></div><div className="fund-row"><span>Chance cards drawn</span><strong>{game.cardDrawCounts.chance}/16</strong></div></section>
       </aside>
