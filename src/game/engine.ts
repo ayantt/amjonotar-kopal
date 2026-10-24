@@ -150,7 +150,8 @@ function resolveOwnedSpace(state: GameState, player: Player, spaceId: string): G
   if (state.cooperativePropertyIds.includes(spaceId)) {
     const space = BOARD.find((s) => s.id === spaceId);
     let rent = getBaseRent(spaceId);
-    if (space?.type === "railroad") rent = 50 * Math.max(1, countRailroads(state, "cooperative"));
+    if (space?.type === "railroad") rent = 50 * Math.max(1, state.cooperativePropertyIds.filter((id) => BOARD.find((s) => s.id === id)?.type === "railroad").length);
+    if (space?.type === "utility") rent = Math.max(1, player.lastRoll.reduce((sum, n) => sum + n, 0)) * 4;
     if (player.role === "politician") rent = Math.ceil(rent / 2);
     const before = state.publicFund;
     let next = pay(state, player.id, null, rent, (space?.name ?? spaceId) + " cooperative rent");
