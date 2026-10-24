@@ -208,3 +208,5 @@
 
 /* Keep the immersive fullscreen view focused on the board and play controls. */
 .game-shell:fullscreen .game-intro{display:none}
+
+.game-shell:fullscreen .site-footer{display:none}
