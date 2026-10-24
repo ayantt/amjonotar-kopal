@@ -12,6 +12,8 @@ export interface PropertyState {
   leaseholderId: string | null;
   leaseExpiresAtGoPass: number | null;
   mortgaged: boolean;
+  houses?: number;
+  hotel?: boolean;
 }
 export type GamePhase = "role-selection" | "awaiting-roll" | "awaiting-end-turn" | "game-over";
 export interface GameEvent { id: number; message: string; kind: "system" | "movement" | "money" | "ai"; }
