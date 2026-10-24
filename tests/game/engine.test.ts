@@ -270,6 +270,39 @@ describe("cooperative economy and victory", () => {
     expect(state.players[1].cash).toBe(1_490);
   });
 
+  it("ends the game when the Politician reaches ৳8,000 in cash plus owned-property value", () => {
+    let state = createNewGame({ humanRole: "politician" });
+    state = {
+      ...state,
+      players: state.players.map((player) => player.id === "player-1"
+        ? { ...player, cash: 7_600, position: 38 }
+        : player),
+    };
+    state = movePlayer(state, "player-1", 2);
+    expect(state.players[0].cash).toBe(8_200);
+    expect(state.phase).toBe("game-over");
+    expect(state.winner).toBe("politician");
+    expect(state.events.some((event) => event.message.includes("৳8,000"))).toBe(true);
+  });
+
+  it("counts active Politician leases toward the seven-property control victory", () => {
+    let state = createNewGame({ humanRole: "politician" });
+    const ids = Object.keys(state.properties).slice(0, 7);
+    state = {
+      ...state,
+      properties: Object.fromEntries(Object.entries(state.properties).map(([id, property], index) => [
+        id,
+        ids.includes(id)
+          ? { ...property, ownerId: null, leaseholderId: "player-1" }
+          : property,
+      ])),
+    };
+    state = movePlayer(state, "player-1", 1);
+    expect(state.phase).toBe("game-over");
+    expect(state.winner).toBe("politician");
+    expect(state.events.some((event) => event.message.includes("controlling at least seven properties"))).toBe(true);
+  });
+
   it("ends the game when the Politician controls seven properties", () => {
     let state = createNewGame({ humanRole: "politician" });
     const ids = Object.keys(state.properties).slice(0, 7);
