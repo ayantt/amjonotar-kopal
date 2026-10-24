@@ -1,0 +1,20 @@
+:root {
+  font-family: Inter, "Noto Sans Bengali", system-ui, sans-serif;
+  color: #17231d;
+  background: #f3c969;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+* { box-sizing: border-box; }
+body { margin: 0; min-width: 320px; min-height: 100vh; }
+button, input { font: inherit; }
+.landing { width: min(100% - 2rem, 960px); margin: 0 auto; padding: clamp(4rem, 12vh, 8rem) 0; }
+.eyebrow { display: inline-block; margin: 0 0 1.5rem; padding: .55rem .8rem; border: 2px solid #17231d; border-radius: 999px; font-size: .85rem; font-weight: 800; letter-spacing: .04em; }
+h1 { max-width: 850px; margin: 0; font-size: clamp(3.5rem, 12vw, 8.5rem); line-height: .98; letter-spacing: -.06em; }
+.subtitle { margin: 1.5rem 0 3rem; font-size: clamp(1.1rem, 3vw, 1.6rem); font-weight: 650; }
+.status-card { max-width: 560px; padding: clamp(1.25rem, 4vw, 2rem); border: 3px solid #17231d; border-radius: 1.25rem; background: #fff8e8; box-shadow: 8px 8px 0 #17231d; }
+.status-label { font-size: .75rem; font-weight: 900; letter-spacing: .12em; }
+.status-card h2 { margin: 1rem 0 .5rem; }
+.status-card p { margin-bottom: 0; line-height: 1.65; }
