@@ -261,4 +261,22 @@ describe("cooperative economy and victory", () => {
     expect(state.phase).toBe("game-over");
     expect(state.winner).toBe("citizens");
   });
+  it("routes rent from a cooperative property into the shared fund", () => {
+    let state = createNewGame({ humanRole: "citizen" });
+    state = { ...state, currentPlayerIndex: 1, cooperativePropertyIds: ["old-dhaka"] };
+    state = movePlayer(state, "player-2", 1);
+    expect(state.cooperativeFund).toBe(10);
+    expect(state.publicFund).toBe(0);
+    expect(state.players[1].cash).toBe(1_490);
+  });
+
+  it("ends the game when the Politician controls seven properties", () => {
+    let state = createNewGame({ humanRole: "politician" });
+    const ids = Object.keys(state.properties).slice(0, 7);
+    state = { ...state, properties: Object.fromEntries(Object.entries(state.properties).map(([id, property]) => [id, ids.includes(id) ? { ...property, ownerId: "player-1" } : property])) };
+    state = movePlayer(state, "player-1", 1);
+    expect(state.phase).toBe("game-over");
+    expect(state.winner).toBe("politician");
+  });
+
 });
