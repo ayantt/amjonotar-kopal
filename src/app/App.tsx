@@ -6,6 +6,12 @@ import type { GameState, PlayerRole } from "../game/types";
 
 const money = (amount: number) => `৳${amount.toLocaleString("en-BD")}`;
 const roleName = (role: PlayerRole) => role === "politician" ? "Politician" : "Citizen";
+function boardPosition(index: number): { gridRow: number; gridColumn: number } {
+  if (index <= 10) return { gridRow: 11, gridColumn: 11 - index };
+  if (index <= 20) return { gridRow: 21 - index, gridColumn: 1 };
+  if (index <= 30) return { gridRow: 1, gridColumn: index - 19 };
+  return { gridRow: index - 29, gridColumn: 11 };
+}
 
 export function App() {
   const [game, setGame] = useState<GameState | null>(null);
@@ -13,7 +19,7 @@ export function App() {
   const [lastAction, setLastAction] = useState("Choose your role to start a new game.");
 
   useEffect(() => {
-    if (!game || game.phase !== "awaiting-roll" || isHumanTurn(game) || busy) return;
+    if (!game || game.phase !== "awaiting-roll" || isHumanTurn(game)) return;
     setBusy(true);
     const timer = window.setTimeout(() => {
       setGame((current) => {
@@ -25,7 +31,7 @@ export function App() {
       setBusy(false);
     }, 650);
     return () => window.clearTimeout(timer);
-  }, [game, busy]);
+  }, [game]);
 
   function startGame(role: PlayerRole) {
     const next = createNewGame({ humanRole: role });
@@ -35,7 +41,7 @@ export function App() {
     setLastAction(`Game started. You are the ${roleName(role)}.`);
   }
   function roll() {
-    if (!game || !isHumanTurn(game)) return;
+    if (!game || !isHumanTurn(game) || game.phase !== "awaiting-roll") return;
     const next = rollAndMove(game);
     setGame(next);
     const player = getCurrentPlayer(game);
@@ -43,7 +49,7 @@ export function App() {
     setLastAction(`You rolled ${player.role === "politician" ? "two dice" : "one die"} and landed on ${landed.name}.`);
   }
   function finishTurn() {
-    if (!game || !isHumanTurn(game)) return;
+    if (!game || !isHumanTurn(game) || game.phase !== "awaiting-end-turn") return;
     setGame(endTurn(game));
     setLastAction("Your turn ended. The computer opponents will play automatically.");
   }
@@ -53,22 +59,20 @@ export function App() {
     setLastAction("Choose your role to start a new game.");
   }
 
-  if (!game) {
-    return <main className="app-shell">
-      <header className="masthead"><span className="seal">আ</span><span>PLACEHOLDER POLITICS CLUB</span><span className="masthead-right">BOARD GAME NO. 01</span></header>
-      <section className="hero">
-        <p className="eyebrow">একটি রাজনৈতিক ব্যঙ্গাত্মক বোর্ড গেম</p>
-        <h1>আমজনতার<br /><em>কপাল।</em></h1>
-        <p className="lede">The people pay. The powerful play.</p>
-        <p className="intro">A crooked little property game about big promises, public money, and who gets to make the rules. Choose your seat. Three computer opponents will take the others.</p>
-        <div className="role-picks">
-          <button className="role-card politician-card" onClick={() => startGame("politician")}><span className="role-number">01 / POWER</span><strong>Play as Politician</strong><span>Two dice. Special privileges. Keep the system on your side.</span><span className="button-copy">TAKE THE CHAIR ↗</span></button>
-          <button className="role-card citizen-card" onClick={() => startGame("citizen")}><span className="role-number">02 / PEOPLE</span><strong>Play as Citizen</strong><span>One die. Three citizens. Your best chance is to work together.</span><span className="button-copy">JOIN THE PUBLIC ↗</span></button>
-        </div>
-      </section>
-      <footer className="site-footer"><span>FICTIONAL POLITICAL SATIRE</span><span>4 SEATS · 1 HUMAN · 3 AI</span></footer>
-    </main>;
-  }
+  if (!game) return <main className="app-shell">
+    <header className="masthead"><span className="seal">আ</span><span>PLACEHOLDER POLITICS CLUB</span><span className="masthead-right">BOARD GAME NO. 01</span></header>
+    <section className="hero">
+      <p className="eyebrow">একটি রাজনৈতিক ব্যঙ্গাত্মক বোর্ড গেম</p>
+      <h1>আমজনতার<br /><em>কপাল।</em></h1>
+      <p className="lede">The people pay. The powerful play.</p>
+      <p className="intro">A crooked little property game about big promises, public money, and who gets to make the rules. Choose your seat. Three computer opponents will take the others.</p>
+      <div className="role-picks">
+        <button className="role-card politician-card" onClick={() => startGame("politician")}><span className="role-number">01 / POWER</span><strong>Play as Politician</strong><span>Two dice. Special privileges. Keep the system on your side.</span><span className="button-copy">TAKE THE CHAIR ↗</span></button>
+        <button className="role-card citizen-card" onClick={() => startGame("citizen")}><span className="role-number">02 / PEOPLE</span><strong>Play as Citizen</strong><span>One die. Three citizens. Your best chance is to work together.</span><span className="button-copy">JOIN THE PUBLIC ↗</span></button>
+      </div>
+    </section>
+    <footer className="site-footer"><span>FICTIONAL POLITICAL SATIRE</span><span>4 SEATS · 1 HUMAN · 3 AI</span></footer>
+  </main>;
 
   const current = getCurrentPlayer(game);
   return <main className="game-shell">
@@ -77,20 +81,15 @@ export function App() {
       <div className="turn-pill"><span className={current.controller === "human" ? "pulse-dot" : "pulse-dot ai-dot"} />{current.controller === "human" ? "YOUR TURN" : "COMPUTER TURN"} · ROUND {game.round}</div>
       <button className="reset-button" onClick={restart}>Restart ↻</button>
     </header>
-    <section className="game-intro">
-      <div><p className="eyebrow">THE PEOPLE PAY. THE POWERFUL PLAY.</p><h1>The board is <em>rigged.</em></h1></div>
-      <p>{busy ? "The computer is making its move…" : lastAction}</p>
-    </section>
+    <section className="game-intro"><div><p className="eyebrow">THE PEOPLE PAY. THE POWERFUL PLAY.</p><h1>The board is <em>rigged.</em></h1></div><p>{busy ? "The computer is making its move…" : lastAction}</p></section>
     <section className="game-layout">
       <div className="board-wrap">
         <div className="board-heading"><span>THE REPUBLIC OF OPPORTUNITY</span><span>40 SPACES</span></div>
         <div className="board-grid">
           {BOARD.map((space, index) => {
             const occupants = game.players.filter((player) => player.position === index);
-            return <div className={`space space-${space.type} ${space.color ? `color-${space.color}` : ""}`} key={space.id}>
-              <span className="space-index">{String(index).padStart(2, "0")}</span>
-              <strong>{space.name}</strong>
-              <small>{space.subtitle}</small>
+            return <div style={boardPosition(index)} className={`space space-${space.type} ${space.color ? `color-${space.color}` : ""}`} key={space.id}>
+              <span className="space-index">{String(index).padStart(2, "0")}</span><strong>{space.name}</strong><small>{space.subtitle}</small>
               {space.price !== undefined && <span className="space-price">{money(space.price)}</span>}
               {occupants.length > 0 && <div className="tokens">{occupants.map((player) => <span title={`${player.name} · ${roleName(player.role)}`} key={player.id} className={`token ${player.role} ${player.controller}`}>{player.controller === "human" ? "YOU" : player.role === "politician" ? "P" : player.name.slice(0,1)}</span>)}</div>}
             </div>;
@@ -100,7 +99,7 @@ export function App() {
       </div>
       <aside className="sidebar">
         <section className="panel current-panel"><div className="panel-label">NOW PLAYING</div><div className="current-player"><span className={`large-token ${current.role}`}>{current.controller === "human" ? "YOU" : current.role === "politician" ? "P" : current.name.slice(0,1)}</span><div><h2>{current.name}</h2><p>{roleName(current.role)} · {current.controller === "human" ? "Human player" : "Computer opponent"}</p></div></div><div className="cash-line"><span>AVAILABLE CASH</span><strong>{money(current.cash)}</strong></div>
-          {current.controller === "human" ? <div className="actions"><button className="primary-action" onClick={roll} disabled={busy}>Roll {current.role === "politician" ? "two dice" : "one die"} <span>↗</span></button><button className="secondary-action" onClick={finishTurn} disabled={busy || current.lastRoll.length === 0}>End turn →</button></div> : <p className="ai-note">{busy ? "Thinking through the next move…" : "Computer turn will begin shortly."}</p>}
+          {current.controller === "human" ? <div className="actions"><button className="primary-action" onClick={roll} disabled={busy || game.phase !== "awaiting-roll"}>Roll {current.role === "politician" ? "two dice" : "one die"} <span>↗</span></button><button className="secondary-action" onClick={finishTurn} disabled={busy || game.phase !== "awaiting-end-turn"}>End turn →</button></div> : <p className="ai-note">{busy ? "Thinking through the next move…" : "Computer turn will begin shortly."}</p>}
         </section>
         <section className="panel players-panel"><div className="panel-label">THE FOUR SEATS</div>{game.players.map((player) => <div className={`player-row ${player.id === current.id ? "selected" : ""}`} key={player.id}><span className={`mini-token ${player.role}`}>{player.controller === "human" ? "Y" : player.role === "politician" ? "P" : player.name.slice(0,1)}</span><div className="player-row-name"><strong>{player.name}</strong><small>{roleName(player.role)} · {player.controller === "human" ? "You" : "AI"}</small></div><strong className="player-cash">{money(player.cash)}</strong><small className="position-label">#{player.position}</small></div>)}</section>
         <section className="panel funds-panel"><div className="panel-label">THE COMMON POOL</div><div className="fund-row"><span>Public treasury</span><strong>{money(game.publicFund)}</strong></div><div className="fund-row"><span>Citizens' cooperative</span><strong>{money(game.cooperativeFund)}</strong></div><p>These funds are tracked separately. The Politician's special rules are part of the satire.</p></section>
