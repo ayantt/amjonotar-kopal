@@ -82,11 +82,6 @@ export function App() {
     return () => window.clearTimeout(timer);
   }, [activeEvent, showEventPopups]);
 
-  useEffect(() => {
-    if (!activeEvent) return;
-    const timer = window.setTimeout(() => setActiveEvent(null), 2600);
-    return () => window.clearTimeout(timer);
-  }, [activeEvent]);
 
   function startGame(role: PlayerRole) {
     const next = createNewGame({ humanRole: role });
