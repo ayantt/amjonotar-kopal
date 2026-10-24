@@ -225,6 +225,7 @@ describe("cooperative economy and victory", () => {
     state = { ...state, currentPlayerIndex: 1, cooperativeFund: 1_000 };
     state = voteForCharter(state, "player-2");
     expect(state.charterPendingRound).toBeNull();
+    state = { ...state, currentPlayerIndex: 2 };
     state = voteForCharter(state, "player-3");
     expect(state.charterPendingRound).toBe(1);
     expect(state.charterVotes).toHaveLength(2);
