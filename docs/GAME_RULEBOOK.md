@@ -29,6 +29,15 @@ Citizen on another Citizen's property pays normal development-adjusted rent. Cit
 - When the Politician sells, the government buys the property back at its full listed price. The Politician receives the full amount and pays no sales tax. The property becomes unowned and returns to the market. The government treasury is allowed to go negative for this buy-back; player cash is never allowed to go negative.
 - Sales are recorded in the Official Record and are resolved by the game engine.
 
+## Property mortgages
+
+- A human player may mortgage an individually owned property during their own turn from its property detail popup. Properties with an active lease and Citizens' Cooperative properties cannot be mortgaged. A mortgaged property earns no rent until redeemed.
+- Citizen mortgage: gross advance is 50% of the listed price; a processing fee of 5% of the listed price is paid to the public treasury and deducted from the advance. The Citizen receives the net amount (45% of listed price). Clearing the mortgage costs 110% of listed price (principal plus 10% interest).
+- Politician mortgage: advance is 100% of listed price, with no processing fee. Clearing the mortgage costs 108% of listed price (principal plus 8% interest).
+- Mortgage redemption requires available cash and is performed by the property owner during their own turn. Interest is calculated on the original listed price, not on net proceeds. Amounts are rounded down for the Citizen's fee and rounded up for redemption where necessary.
+- Automatic mortgage actions during debt settlement use the same role-specific advance and fee rules. Processing fees enter the public treasury. The mortgage remains until the owner pays the full redemption amount.
+- Mortgage and redemption actions are recorded in the Official Record. A property cannot be sold while mortgaged under the current sale rule.
+
 ## Implemented property-loop details (current code)
 
 - Unclaimed land, railroads, and utilities pause the turn for Buy, Lease, or Decline. The engine exposes only affordable actions; the same legal-action list drives the human panel and AI.
@@ -36,7 +45,7 @@ Citizen on another Citizen's property pays normal development-adjusted rent. Cit
 - Utility charge uses the visitor's roll total: Citizen-controlled utility costs 4× that total; Politician-controlled utility costs 10× plus ৳30. Politician visitors pay no utility charge.
 - Politician visitors pay half rent on Citizen-controlled land. Politician leases collect half land rent. An active leaseholder receives rent instead of the property owner, preventing duplicate payouts. Citizen leases expire after five GO passes; Politician leases are permanent.
 - Income Tax currently charges Citizens ৳100 and the Politician ৳50. Development Levy charges Citizens ৳100 and exempts the Politician. Politician landing on Public Plaza withdraws the available public treasury; other players receive no jackpot.
-- These are initial Phase 2 values. Card effects and debt/bankruptcy settlement are implemented. Cooperative purchases and victory triggers are now partially implemented; houses, mortgage redemption, and player-directed debt choices remain future work.
+- These are initial Phase 2 values. Card effects and debt/bankruptcy settlement are implemented. Cooperative purchases and victory triggers are now partially implemented; houses and player-directed debt choices remain future work.
 
 ## Implemented card and debt resolution
 
@@ -45,7 +54,7 @@ Citizen on another Citizen's property pays normal development-adjusted rent. Cit
 - Optional Citizen contributions are automatically skipped for the human player (to avoid silently spending their cash without a choice); AI Citizens contribute only when they can afford the amount. The human receives an event-log explanation. This is a temporary interaction rule until explicit card-choice UI is added.
 - Conditional public-fund collections pay only the available amount; any shortfall is waived rather than carried as hidden debt. Conditional public payments are skipped when the public-fund condition is not met.
 - Payments first use available cash, then automatically mortgage the debtor's unmortgaged owned properties at half purchase price. If the bill still cannot be paid, the debtor is declared bankrupt, remaining cash is set to zero, owned property is transferred according to the current rule (Citizen assets go to the Politician; Politician assets go to the named creditor where applicable), and the player's leases are cleared.
-- Bankruptcy ends the game if the Politician goes bankrupt (Citizens win) or when two Citizens go bankrupt (Politician wins). The cooperative Citizen victory condition is implemented in initial form as described below; mortgage redemption remains deferred.
+- Bankruptcy ends the game if the Politician goes bankrupt (Citizens win) or when two Citizens go bankrupt (Politician wins). The cooperative Citizen victory condition is implemented in initial form as described below; mortgage redemption is implemented.
 - The event log records card draws, payments, mortgage actions, bankruptcy, and skip-turn effects. The board UI shows deck draw counts and a game-over message.
 
 ## Housing (later phase)
@@ -60,8 +69,8 @@ Draw from Chance/Community Chest; shuffle at start and reshuffle when draw pile 
 ## Public services and jail
 Citizen landing on Politician-controlled Water Works pays standard charge plus maintenance even if service is disrupted. Politician pays nothing; collects half water charge from Citizens, or full plus emergency fee when Politician-controlled. Debt resolution and lost turns are separate states. Jailed Citizens may pay bail or use release card and do not collect rent while jailed. Politician may pay processing fee to remain free unless investigation overrides privilege.
 
-## Debt and bankruptcy (later phase)
-Citizens may use cash, sell assets, mortgage (half purchase price; mortgaged property earns no rent and cannot be developed), or request cooperative rescue. Politician mortgages for full purchase price and still collects rent. Citizen-to-Citizen trades allowed. Selling to Politician requires unanimous active-Citizen approval. If still unable to pay, Citizen goes bankrupt and remaining cash/property transfer to Politician after atomic settlement. Politician cannot bankrupt from ordinary debt; government support covers shortfall and records liability.
+## Debt and bankruptcy
+Citizens may use cash, sell assets, mortgage (Citizen receives 45% net after fee; Politician receives full price; mortgaged property earns no rent until redemption), or request cooperative rescue. Politician mortgages for full purchase price and still collects rent. Citizen-to-Citizen trades allowed. Selling to Politician requires unanimous active-Citizen approval. If still unable to pay, Citizen goes bankrupt and remaining cash/property transfer to Politician after atomic settlement. Politician cannot bankrupt from ordinary debt; government support covers shortfall and records liability.
 
 ## Cooperative fund and victory
 Citizens can contribute ৳100 or ৳500 through the UI to a separate fund; the Politician cannot withdraw, tax, or seize it. A Citizen may purchase an unclaimed property from the fund when it can cover the listed price. Cooperative property rent flows into the cooperative fund. The UI supports a majority vote for the People's Charter; once approved with at least ৳1,000 in the fund, the Charter is pending until the next Citizen round. The Citizens must keep all three active, control at least eight properties jointly (including cooperative properties), retain combined cash of at least ৳3,000, and preserve at least ৳1,000 in the cooperative fund for the joint victory to trigger.
