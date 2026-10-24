@@ -264,3 +264,9 @@
 .token.player-color-player-2,.mini-token.player-color-player-2,.large-token.player-color-player-2{background:#3976a8;color:#fff}
 .token.player-color-player-3,.mini-token.player-color-player-3,.large-token.player-color-player-3{background:#4f8151;color:#fff}
 .token.player-color-player-4,.mini-token.player-color-player-4,.large-token.player-color-player-4{background:#a56bb0;color:#fff}
+
+
+/* Sound-effects preference control */
+.sound-toggle{border:1px solid #9d8c6d;background:transparent;color:var(--ink);padding:.55rem .65rem;font-size:.55rem;font-weight:950;letter-spacing:.06em;white-space:nowrap}
+.sound-toggle.is-on{background:#e4e8d5;border-color:#7b8a50;color:#3e4b2b}
+@media(max-width:580px){.sound-toggle{font-size:.46rem;padding:.45rem .35rem;letter-spacing:0}.game-header .header-actions{flex-wrap:wrap;justify-content:flex-end}}
