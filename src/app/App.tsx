@@ -84,7 +84,7 @@ export function App() {
       <button className="reset-button" onClick={restart}>Restart ↻</button>
     </header>
     <section className="game-intro"><div><p className="eyebrow">THE PEOPLE PAY. THE POWERFUL PLAY.</p><h1>The board is <em>rigged.</em></h1></div><p>{busy ? "The computer is making its move…" : lastAction}</p></section>
-    {game.phase === "game-over" && <section className="game-over-panel"><strong>GAME OVER</strong><p>{game.winner === "politician" ? "The Politician wins. Two Citizens have gone bankrupt." : game.winner === "citizens" ? "The Politician has gone bankrupt. The Citizens win together." : "The game has ended."}</p><button className="primary-action" onClick={restart}>Start a new game ↗</button></section>}
+    {game.phase === "game-over" && <section className="game-over-panel"><strong>GAME OVER</strong><p>{game.winner === "politician" ? "The Politician wins by consolidating power, wealth, or through Citizen bankruptcies." : game.winner === "citizens" ? (game.charterActivated ? "The Citizens held the People's Charter and win together." : "The Politician has gone bankrupt. The Citizens win together.") : "The game has ended."}</p><button className="primary-action" onClick={restart}>Start a new game ↗</button></section>}
     <section className="game-layout">
       <div className="board-wrap">
         <div className="board-heading"><span>THE REPUBLIC OF OPPORTUNITY</span><span>40 SPACES</span></div>
