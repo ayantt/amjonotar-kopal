@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { BOARD_SPACE_COUNT } from "../../src/game/board";
 import { createNewGame, endTurn, getDiceCount, movePlayer, rollDice, rollAndMove, resolvePropertyAction, validateSetup } from "../../src/game/engine";
-import { chooseAiPropertyAction, runAiTurn } from "../../src/game/turns";
+import { runAiTurn } from "../../src/game/turns";
 import { getLegalPropertyActions } from "../../src/game/properties";
 
 describe("game setup", () => {
@@ -95,6 +95,19 @@ describe("property actions and rent", () => {
     expect(state.properties["old-dhaka"].leaseholderId).toBe("player-2");
     expect(state.properties["old-dhaka"].leaseExpiresAtGoPass).toBe(5);
     expect(state.players[1].cash).toBe(1_470);
+  });
+  it("expires a Citizen lease on the fifth GO pass", () => {
+    let state = createNewGame({ humanRole: "citizen" });
+    state = {
+      ...state,
+      currentPlayerIndex: 1,
+      players: state.players.map((player, index) => index === 1 ? { ...player, position: 39 } : player),
+      properties: { ...state.properties, "old-dhaka": { ...state.properties["old-dhaka"], leaseholderId: "player-2", leaseExpiresAtGoPass: 1 } },
+    };
+    state = movePlayer(state, "player-2", 1);
+    expect(state.players[1].goPasses).toBe(1);
+    expect(state.properties["old-dhaka"].leaseholderId).toBeNull();
+    expect(state.events.some((event) => event.message.includes("lease on Old Dhaka") || event.message.includes("lease on Purono Dhaka"))).toBe(true);
   });
   it("AI chooses an affordable property action and resolves it before ending its turn", () => {
     let state = createNewGame({ humanRole: "citizen" });
