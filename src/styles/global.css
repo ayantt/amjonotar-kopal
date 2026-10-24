@@ -92,3 +92,19 @@
   .constitution-body article{padding:.85rem 0}
   .constitution-footer{align-items:flex-start;flex-direction:column;padding:.8rem 1rem}
 }
+
+
+/* Official Record spans the full height of the board and scrolls through every player's events */
+.game-layout{align-items:stretch}
+.game-layout>.log-panel{height:100%;min-height:0;display:flex;flex-direction:column}
+.game-layout>.log-panel .panel-label{flex:0 0 auto}
+.game-layout>.log-panel .event-list{display:block;flex:1 1 auto;min-height:0;overflow-y:auto;overscroll-behavior:contain;padding-right:.35rem;scrollbar-gutter:stable}
+.game-layout>.log-panel .event{display:flex;align-items:flex-start}
+.game-layout>.log-panel .event p{overflow-wrap:anywhere}
+@media(min-width:1101px){
+  .game-layout>.log-panel{max-height:100%}
+}
+@media(max-width:1100px){
+  .game-layout>.log-panel{height:auto;max-height:420px}
+  .game-layout>.log-panel .event-list{max-height:340px;overflow-y:auto}
+}
