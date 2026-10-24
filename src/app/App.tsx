@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { BOARD } from "../game/board";
-import { buyCooperativeProperty, contributeToCooperative, createNewGame, endTurn, getCurrentPlayer, isHumanTurn, resolvePropertyAction, rollAndMove, sellProperty, validateSetup, voteForCharter } from "../game/engine";
+import { buyCooperativeProperty, contributeToCooperative, createNewGame, endTurn, getCurrentPlayer, getMortgageTerms, isHumanTurn, mortgageProperty, redeemMortgage, resolvePropertyAction, rollAndMove, sellProperty, validateSetup, voteForCharter } from "../game/engine";
 import { runAiTurn } from "../game/turns";
 import { getBaseRent, getLegalPropertyActions } from "../game/properties";
 import type { GameState, PlayerRole } from "../game/types";
@@ -247,6 +247,7 @@ export function App() {
             <div className="property-detail"><span>LEASEHOLDER</span><strong>{selectedLeaseholder ? (selectedLeaseholder.name) : "None"}</strong></div>
           </div>
           <div className="property-detail-status"><span>STATUS</span><strong>{selectedProperty?.mortgaged ? "Mortgaged — no rent collected" : game.cooperativePropertyIds.includes(selectedSpace.id) ? "Shared cooperative property" : selectedOwner ? "Owned" : selectedLeaseholder ? "Leased" : "Available to purchase or lease"}</strong></div>
+          {selectedProperty?.ownerId === current.id && selectedSpace.price !== undefined && <div className="property-detail-status"><span>MORTGAGE TERMS · {roleName(current.role).toUpperCase()}</span><strong>{selectedProperty.mortgaged ? `Clear for ${money(getMortgageTerms(current.role, selectedSpace.price).redemptionAmount)}` : `Receive ${money(getMortgageTerms(current.role, selectedSpace.price).netAdvance)} net`}</strong><p className="property-detail-note">{selectedProperty.mortgaged ? `Principal plus ${current.role === "politician" ? "8%" : "10%"} interest. Rent is suspended until cleared.` : current.role === "politician" ? "Full listed price, no processing fee; 8% interest to clear." : `Half the listed price less a 5% processing fee (${money(getMortgageTerms(current.role, selectedSpace.price).processingFee)}); 10% interest to clear.`}</p></div>}
           <p className="property-detail-note">{selectedSpace.type === "utility"
             ? "Utility rent is calculated from the player's dice roll and the applicable role rules."
             : selectedSpace.type === "railroad"
@@ -254,11 +255,19 @@ export function App() {
               : "Actual rent may differ from base rent depending on the owner's role, lease terms, and any applicable game rules."}</p>
         </div>
         <footer className="property-modal-footer"><span>THE REPUBLIC OF OPPORTUNITY · SPACE {BOARD.findIndex((space) => space.id === selectedSpace.id)}</span><div className="property-modal-actions">
-          {selectedProperty?.ownerId === current.id && current.controller === "human" && isHumanTurn(game) && !selectedProperty.leaseholderId && !selectedProperty.mortgaged && !game.cooperativePropertyIds.includes(selectedSpace.id) && selectedSpace.price !== undefined && <button className="sell-property-button" disabled={current.role === "citizen" && (game.players.find((player) => player.role === "politician")?.cash ?? 0) < selectedSpace.price} onClick={() => {
-            const next = sellProperty(game, current.id, selectedSpace.id);
-            setGame(next);
+          {selectedProperty?.ownerId === current.id && current.controller === "human" && isHumanTurn(game) && !selectedProperty.leaseholderId && !game.cooperativePropertyIds.includes(selectedSpace.id) && selectedSpace.price !== undefined && <button className="sell-property-button" disabled={!selectedProperty.mortgaged && current.role === "citizen" && (game.players.find((player) => player.role === "politician")?.cash ?? 0) < selectedSpace.price} onClick={() => {
+            if (selectedProperty.mortgaged) {
+              setGame((state) => state ? redeemMortgage(state, current.id, selectedSpace.id) : state);
+            } else {
+              const next = sellProperty(game, current.id, selectedSpace.id);
+              setGame(next);
+            }
             setSelectedPropertyId(null);
-          }}>{current.role === "politician" ? "SELL TO GOVERNMENT" : (game.players.find((player) => player.role === "politician")?.cash ?? 0) < selectedSpace.price ? "POLITICIAN NEEDS CASH" : "SELL TO POLITICIAN"} <span>{money(selectedSpace.price)}</span></button>}
+          }}>{selectedProperty.mortgaged ? (current.cash >= getMortgageTerms(current.role, selectedSpace.price).redemptionAmount ? "CLEAR MORTGAGE" : "NOT ENOUGH CASH TO CLEAR") : current.role === "politician" ? "SELL TO GOVERNMENT" : (game.players.find((player) => player.role === "politician")?.cash ?? 0) < selectedSpace.price ? "POLITICIAN NEEDS CASH" : "SELL TO POLITICIAN"} <span>{selectedProperty.mortgaged ? money(getMortgageTerms(current.role, selectedSpace.price).redemptionAmount) : money(selectedSpace.price)}</span></button>}
+          {selectedProperty?.ownerId === current.id && current.controller === "human" && isHumanTurn(game) && !selectedProperty.leaseholderId && !selectedProperty.mortgaged && !game.cooperativePropertyIds.includes(selectedSpace.id) && selectedSpace.price !== undefined && <button className="sell-property-button" onClick={() => {
+            setGame((state) => state ? mortgageProperty(state, current.id, selectedSpace.id) : state);
+            setSelectedPropertyId(null);
+          }}>MORTGAGE PROPERTY <span>+{money(getMortgageTerms(current.role, selectedSpace.price).netAdvance)}</span></button>}
           <button className="primary-action" onClick={() => setSelectedPropertyId(null)}>RETURN TO BOARD <span>×</span></button>
         </div></footer>
       </section>
