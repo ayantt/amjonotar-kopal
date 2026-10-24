@@ -116,6 +116,14 @@ export function movePlayer(state: GameState, playerId: string, steps: number): G
   const cashReward = crossedGoCount * reward + (exactGo ? exactBonus : 0);
   let next: GameState = { ...state, phase: "awaiting-end-turn", pendingPropertyId: null,
     players: state.players.map((candidate, i) => i === index ? { ...candidate, position: newPosition, cash: candidate.cash + cashReward, goPasses: candidate.goPasses + crossedGoCount } : candidate) };
+  if (crossedGoCount > 0) {
+    const updatedPlayer = next.players[index];
+    const expired = Object.values(next.properties).filter((property) => property.leaseholderId === player.id && property.leaseExpiresAtGoPass !== null && updatedPlayer.goPasses >= property.leaseExpiresAtGoPass);
+    for (const property of expired) {
+      next = { ...next, properties: { ...next.properties, [property.spaceId]: { ...property, leaseholderId: null, leaseExpiresAtGoPass: null } } };
+      next = addEvent(next, `${player.name}'s lease on ${BOARD.find((space) => space.id === property.spaceId)?.name ?? property.spaceId} expired after passing Shurur Line five times.`);
+    }
+  }
   next = addEvent(next, `${player.name} moved ${steps} spaces to ${BOARD[newPosition].name}.`, "movement");
   if (crossedGoCount) next = addEvent(next, `${player.name} collected ৳${reward * crossedGoCount} for passing Shurur Line.`, "money");
   if (exactGo) next = addEvent(next, `${player.name} landed exactly on Shurur Line and received an extra ৳${exactBonus}.`, "money");
