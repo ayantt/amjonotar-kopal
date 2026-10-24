@@ -182,6 +182,9 @@ function resolveOwnedSpace(state: GameState, player: Player, spaceId: string): G
     if (player.role === "citizen" && controller.role === "politician") rent *= 2;
   } else {
     if (property.leaseholderId) rent = controller.role === "politician" ? Math.ceil(rent / 2) : rent;
+    const houses = property.houses ?? 0;
+    const multiplier = property.hotel ? 6 : houses > 0 ? houses + 1 : 1;
+    rent *= multiplier;
     if (player.role === "politician" && controller.role === "citizen") rent = Math.ceil(rent / 2);
   }
   return pay(state, player.id, controllerId, rent, `${space.name} rent`);
@@ -330,6 +333,15 @@ export function movePlayer(state: GameState, playerId: string, steps: number): G
   next = addEvent(next, `${player.name} moved ${steps} spaces to ${BOARD[newPosition].name}.`, "movement");
   if (crossedGoCount) next = addEvent(next, `${player.name} collected ৳${reward * crossedGoCount} for passing Shurur Line.`, "money");
   if (exactGo) next = addEvent(next, `${player.name} landed exactly on Shurur Line and received an extra ৳${exactBonus}.`, "money");
+  if (crossedGoCount > 0 && player.role === "citizen") {
+    const developed = Object.values(next.properties).filter((property) => property.ownerId === player.id && ((property.houses ?? 0) > 0 || property.hotel));
+    for (const property of developed) {
+      const space = BOARD.find((item) => item.id === property.spaceId);
+      const maintenance = ((property.houses ?? 0) * 50 + (property.hotel ? 200 : 0)) * crossedGoCount;
+      if (maintenance > 0) next = pay(next, player.id, null, maintenance, (space?.name ?? property.spaceId) + " building maintenance");
+    }
+    if (developed.length > 0) next = addEvent(next, player.name + " paid building maintenance for passing Shurur Line.", "money");
+  }
   next = resolveLanding(next, player.id);
   return checkVictory(next);
 }
@@ -366,6 +378,42 @@ export function resolvePropertyAction(state: GameState, action: PropertyAction):
   }
   return checkVictory(next);
 }
+export type BuildingAction = "house" | "hotel";
+export function getBuildingCost(role: PlayerRole, action: BuildingAction, houses = 0): number {
+  const base = action === "hotel" ? 600 : ([200, 300, 400][houses] ?? 0);
+  return role === "politician" ? Math.floor(base / 2) : base;
+}
+export function getBuildingRentMultiplier(property: { houses?: number; hotel?: boolean }): number {
+  return property.hotel ? 6 : (property.houses ?? 0) > 0 ? (property.houses ?? 0) + 1 : 1;
+}
+export function buildProperty(state: GameState, playerId: string, spaceId: string, action: BuildingAction): GameState {
+  if (state.phase === "game-over") throw new Error("The game has ended.");
+  const player = state.players.find((item) => item.id === playerId);
+  const current = getCurrentPlayer(state);
+  const space = BOARD.find((item) => item.id === spaceId);
+  const property = state.properties[spaceId];
+  if (!player || player.id !== current.id || player.controller !== "human" || !isHumanTurn(state)) throw new Error("Only the human player may build during their own turn.");
+  if (!space || space.type !== "property" || !space.price || !property || property.ownerId !== playerId) throw new Error("You can only build on land you own.");
+  if (property.mortgaged || property.leaseholderId || state.cooperativePropertyIds.includes(spaceId)) throw new Error("Mortgaged, leased, or cooperative property cannot be developed.");
+  const houses = property.houses ?? 0;
+  if (property.hotel) throw new Error("This property already has a hotel.");
+  if (action === "house" && houses >= 3) throw new Error("A property can have at most three houses before a hotel.");
+  if (action === "hotel" && player.role !== "politician" && houses !== 3) throw new Error("Citizens must build three houses before upgrading to a hotel.");
+  if (player.role === "citizen") {
+    const group = BOARD.filter((item) => item.type === "property" && item.color === space.color);
+    if (!space.color || group.some((item) => state.properties[item.id]?.ownerId !== playerId || state.properties[item.id]?.mortgaged || state.properties[item.id]?.leaseholderId || state.cooperativePropertyIds.includes(item.id))) throw new Error("Citizens must own the full unmortgaged color group to build.");
+    const level = (itemId: string) => { const item = state.properties[itemId]; return item?.hotel ? 4 : item?.houses ?? 0; };
+    const currentLevel = level(spaceId);
+    if (action === "house" && group.some((item) => level(item.id) < currentLevel)) throw new Error("Citizens must build evenly across a color group.");
+    if (action === "hotel" && group.some((item) => level(item.id) < currentLevel)) throw new Error("Citizens must build evenly across a color group.");
+  }
+  const cost = getBuildingCost(player.role, action, houses);
+  if (cost <= 0 || player.cash < cost) throw new Error("Not enough cash for this building.");
+  const updated = action === "house" ? { ...property, houses: houses + 1, hotel: false } : { ...property, houses: 0, hotel: true };
+  const next: GameState = { ...state, players: state.players.map((item) => item.id === playerId ? { ...item, cash: item.cash - cost } : item), properties: { ...state.properties, [spaceId]: updated } };
+  return checkVictory(addEvent(next, player.name + " built " + (action === "hotel" ? "a hotel" : "a house") + " on " + space.name + " for ৳" + cost + ". Rent multiplier is now " + getBuildingRentMultiplier(updated) + "×.", "money"));
+}
+
 export interface MortgageTerms {
   grossAdvance: number;
   processingFee: number;
