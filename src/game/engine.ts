@@ -116,22 +116,28 @@ function applyCardEffect(state: GameState, playerId: string, effect: CardEffect,
   const player = next.players.find((p) => p.id === playerId);
   if (!player) return next;
   if (effect.kind === "cash") {
-    if (effect.recipient === "bank") return effect.amount >= 0
-      ? { ...next, players: next.players.map((p) => p.id === playerId ? { ...p, cash: p.cash + effect.amount } : p) } && addEvent({ ...next, players: next.players.map((p) => p.id === playerId ? { ...p, cash: p.cash + effect.amount } : p) }, `${player.name} received ৳${effect.amount} from the card.`, "money")
-      : pay(next, playerId, null, -effect.amount, "card expense");
+    if (effect.recipient === "bank") {
+      if (effect.amount >= 0) {
+        next = { ...next, players: next.players.map((p) => p.id === playerId ? { ...p, cash: p.cash + effect.amount } : p) };
+        return addEvent(next, `${player.name} received ৳${effect.amount} from ${effect.amount === 0 ? "the card" : "the public system"}.`, "money");
+      }
+      return pay(next, playerId, null, -effect.amount, "card expense");
+    }
     if (effect.recipient === "public") return pay(next, playerId, null, effect.amount, "card payment to public fund");
     if (effect.recipient === "cooperative") {
-      const paid = Math.min(player.cash, effect.amount);
-      next = { ...next, players: next.players.map((p) => p.id === playerId ? { ...p, cash: p.cash - paid } : p), cooperativeFund: next.cooperativeFund + paid };
-      next = addEvent(next, `${player.name} contributed ৳${paid} to the Citizens' cooperative fund.`, "money");
-      if (paid < effect.amount) next = addEvent(next, `The cooperative contribution was short by ৳${effect.amount-paid}; the shortfall was waived.`);
-      return next;
+      if (effect.amount >= 0) return addEvent({ ...next, cooperativeFund: next.cooperativeFund + effect.amount }, `${player.name} received a cooperative distribution of ৳${effect.amount}.`, "money");
+      return applyCardEffect(next, playerId, { kind: "contribute", amount: -effect.amount, destination: "cooperative", optional: false }, depth);
     }
     if (effect.recipient === "public-if-available") {
       const amount = Math.min(next.publicFund, effect.amount);
       next = { ...next, publicFund: next.publicFund - amount, players: next.players.map((p) => p.id === playerId ? { ...p, cash: p.cash + amount } : p) };
-      next = addEvent(next, `${player.name} collected ৳${amount} from the public fund; any unavailable balance was waived.`, "money");
-      return next;
+      return addEvent(next, `${player.name} collected ৳${amount} from the public fund; any unavailable balance was waived.`, "money");
+    }
+    if (effect.recipient === "public-payment-if-available") {
+      const amount = Math.min(next.publicFund, effect.amount);
+      if (amount === 0) return addEvent(next, `${player.name} had no public-fund payment due; no liability was carried forward.`);
+      next = { ...next, players: next.players.map((p) => p.id === playerId ? { ...p, cash: p.cash - Math.min(p.cash, amount) } : p), publicFund: next.publicFund + Math.min(player.cash, amount) };
+      return addEvent(next, `${player.name} paid ৳${Math.min(player.cash, amount)} into the public fund from an available-balance card.`, "money");
     }
     for (const citizen of next.players.filter((p) => p.role === "citizen" && p.active && p.id !== playerId)) {
       next = pay(next, citizen.id, playerId, effect.amount, "card collection");
