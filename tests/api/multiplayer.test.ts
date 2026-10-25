@@ -23,8 +23,8 @@ vi.mock("@neondatabase/serverless", () => ({
       const room: FakeRoom = {
         code: String(values[0]),
         status: "waiting",
-        hostPlayerId: String(values[2]),
-        seats: JSON.parse(String(values[3])),
+        hostPlayerId: String(values[1]),
+        seats: JSON.parse(String(values[2])),
         state: null,
         version: 1,
         lastActionId: null,
