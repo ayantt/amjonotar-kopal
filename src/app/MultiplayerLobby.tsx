@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { BOARD } from "../game/board";
 import { getLegalPropertyActions } from "../game/properties";
 import { getBuildingCost, getMortgageTerms } from "../game/engine";
@@ -32,7 +32,7 @@ export function MultiplayerLobby({ onBack }: { onBack: () => void }) {
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [showEventPopups, setShowEventPopups] = useState(true);
   const [activeEvent, setActiveEvent] = useState<GameState["events"][number] | null>(null);
-  const lastSeenEventId = useState<{ current: number | null }>({ current: null })[0];
+  const lastSeenEventId = useRef<number | null>(null);
 
   const saveCredentials = useCallback((value: Credentials | null) => {
     setCredentials(value);
@@ -58,6 +58,22 @@ export function MultiplayerLobby({ onBack }: { onBack: () => void }) {
     const timer = window.setInterval(() => void refresh(true), 1600);
     return () => window.clearInterval(timer);
   }, [credentials, refresh, working]);
+
+  useEffect(() => {
+    const events = room?.state?.events ?? [];
+    if (events.length === 0) return;
+    const latest = events[events.length - 1];
+    if (lastSeenEventId.current === null) {
+      lastSeenEventId.current = latest.id;
+      return;
+    }
+    if (latest.id <= lastSeenEventId.current) return;
+    lastSeenEventId.current = latest.id;
+    if (!showEventPopups) return;
+    setActiveEvent(latest);
+    const timer = window.setTimeout(() => setActiveEvent((active) => active?.id === latest.id ? null : active), 2600);
+    return () => window.clearTimeout(timer);
+  }, [room?.state?.events, showEventPopups]);
 
   const current = room?.state?.players[room.state.currentPlayerIndex];
   const isMyTurn = Boolean(current && credentials && current.id === credentials.playerId && room?.status === "active");
