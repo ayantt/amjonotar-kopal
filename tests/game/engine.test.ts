@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { BOARD_SPACE_COUNT } from "../../src/game/board";
-import { buyCooperativeProperty, contributeToCooperative, createNewGame, endTurn, getDiceCount, movePlayer, rollDice, rollAndMove, resolvePropertyAction, validateSetup, voteForCharter } from "../../src/game/engine";
+import { GAME_RULES } from "../../src/game/rules";
+import { buyCooperativeProperty, contributeToCooperative, createNewGame, endTurn, getDiceCount, movePlayer, rollDice, rollAndMove, resolvePropertyAction, validateSetup } from "../../src/game/engine";
 import { runAiTurn } from "../../src/game/turns";
 import { getLegalPropertyActions } from "../../src/game/properties";
 
@@ -40,14 +41,14 @@ describe("dice and movement", () => {
     // 38 + 3 lands on Purono Dhaka (a property, not a card), so only the GO reward applies.
     const moved = movePlayer(nearEnd, "player-1", 3);
     expect(moved.players[0].position).toBe(1);
-    expect(moved.players[0].cash).toBe(2_400);
+    expect(moved.players[0].cash).toBe(2_000 + GAME_RULES.politicianGoReward);
   });
   it("pays the GO pass reward and exact-landing bonus when landing exactly on GO", () => {
     const state = createNewGame({ humanRole: "politician" });
     const nearEnd = { ...state, players: state.players.map((player, i) => i === 0 ? { ...player, position: 38 } : player) };
     const moved = movePlayer(nearEnd, "player-1", 2);
     expect(moved.players[0].position).toBe(0);
-    expect(moved.players[0].cash).toBe(2_600);
+    expect(moved.players[0].cash).toBe(2_000 + GAME_RULES.politicianGoReward + GAME_RULES.politicianExactGoBonus);
   });
   it("rejects movement by the wrong player or a second roll in one turn", () => {
     const state = createNewGame({ humanRole: "politician" });
@@ -157,27 +158,24 @@ describe("card effects and debt resolution", () => {
     state = movePlayer(state, "player-2", 1);
     expect(state.events.some((event) => event.message.includes("mortgaged Purono Dhaka"))).toBe(true);
     expect(state.players[1].bankrupt).toBe(true);
-    expect(state.properties["old-dhaka"].ownerId).toBe("player-1");
+    expect(state.properties["old-dhaka"].ownerId).toBeNull(); // creditor was the public treasury, so the land returns to the market
     expect(state.players.every((player) => player.cash >= 0)).toBe(true);
   });
 
-  it("lets the Politician cover a small bill with a full-price mortgage and stay solvent", () => {
+  it("lets the Politician cover a bill with a full-price mortgage and stay solvent", () => {
     let state = createNewGame({ humanRole: "politician" });
-    state = movePlayer(state, "player-1", 1);
-    state = resolvePropertyAction(state, "buy");
     state = {
       ...state,
-      phase: "awaiting-roll",
-      currentPlayerIndex: 0,
+      properties: { ...state.properties, "dhaka-heights": { ...state.properties["dhaka-heights"], ownerId: "player-1" } },
       players: state.players.map((player, index) => index === 0 ? { ...player, position: 3, cash: 0 } : player),
     };
-    // Income Tax is ৳50 for the Politician; the ৳60 full-price advance covers it, leaving ৳10.
+    // Income Tax (৳100) is covered by the ৳400 full-price advance on Dhaka Heights, leaving ৳300.
     state = movePlayer(state, "player-1", 1);
-    expect(state.events.some((event) => event.message.includes("mortgaged Purono Dhaka"))).toBe(true);
-    expect(state.properties["old-dhaka"].mortgaged).toBe(true);
+    expect(state.events.some((event) => event.message.includes("mortgaged Dhaka Heights"))).toBe(true);
+    expect(state.properties["dhaka-heights"].mortgaged).toBe(true);
     expect(state.players[0].bankrupt).toBe(false);
-    expect(state.players[0].cash).toBe(10);
-    expect(state.publicFund).toBe(50);
+    expect(state.players[0].cash).toBe(300);
+    expect(state.publicFund).toBe(GAME_RULES.incomeTaxPolitician);
   });
 });
 
@@ -230,7 +228,7 @@ describe("turn-changing card effects", () => {
   });
 });
 
-describe("cooperative economy and victory", () => {
+describe("cooperative economy", () => {
   it("moves a Citizen contribution into the separate cooperative fund", () => {
     const initial = createNewGame({ humanRole: "citizen" });
     const state = { ...initial, currentPlayerIndex: 1 };
@@ -239,17 +237,6 @@ describe("cooperative economy and victory", () => {
     expect(next.players[1].cash).toBe(citizen.cash - 100);
     expect(next.cooperativeFund).toBe(100);
     expect(next.publicFund).toBe(0);
-  });
-
-  it("requires a majority and a thousand taka before the Charter is pending", () => {
-    let state = createNewGame({ humanRole: "citizen" });
-    state = { ...state, currentPlayerIndex: 1, cooperativeFund: 1_000 };
-    state = voteForCharter(state, "player-2");
-    expect(state.charterPendingRound).toBeNull();
-    state = { ...state, currentPlayerIndex: 2 };
-    state = voteForCharter(state, "player-3");
-    expect(state.charterPendingRound).toBe(1);
-    expect(state.charterVotes).toHaveLength(2);
   });
 
   it("allows Citizens to buy an unclaimed property from the cooperative fund", () => {
@@ -261,27 +248,6 @@ describe("cooperative economy and victory", () => {
     expect(state.pendingPropertyId).toBeNull();
   });
 
-  it("requires all three Citizens and the fund/property/cash thresholds for a joint victory", () => {
-    let state = createNewGame({ humanRole: "citizen" });
-    const citizenIds = ["player-2", "player-3", "player-4"];
-    const propertyIds = Object.keys(state.properties).slice(0, 8);
-    state = {
-      ...state,
-      phase: "awaiting-end-turn",
-      currentPlayerIndex: 3,
-      cooperativeFund: 1_000,
-      charterVotes: ["player-2", "player-3"],
-      charterPendingRound: 1,
-      properties: Object.fromEntries(Object.entries(state.properties).map(([id, property], index) => [id, propertyIds.includes(id) ? { ...property, ownerId: citizenIds[index % 3] } : property])),
-      players: state.players.map((player) => player.role === "citizen" ? { ...player, cash: 1_100 } : player),
-    };
-    state = endTurn(state);
-    expect(state.currentPlayerIndex).toBe(0);
-    state = { ...state, phase: "awaiting-end-turn", currentPlayerIndex: 0, round: 2 };
-    state = endTurn(state);
-    expect(state.phase).toBe("game-over");
-    expect(state.winner).toBe("citizens");
-  });
   it("routes rent from a cooperative property into the shared fund", () => {
     let state = createNewGame({ humanRole: "citizen" });
     state = { ...state, currentPlayerIndex: 1, cooperativePropertyIds: ["old-dhaka"] };
@@ -290,47 +256,4 @@ describe("cooperative economy and victory", () => {
     expect(state.publicFund).toBe(0);
     expect(state.players[1].cash).toBe(1_490);
   });
-
-  it("ends the game when the Politician reaches ৳8,000 in cash plus owned-property value", () => {
-    let state = createNewGame({ humanRole: "politician" });
-    state = {
-      ...state,
-      players: state.players.map((player) => player.id === "player-1"
-        ? { ...player, cash: 7_600, position: 38 }
-        : player),
-    };
-    state = movePlayer(state, "player-1", 2);
-    expect(state.players[0].cash).toBe(8_200);
-    expect(state.phase).toBe("game-over");
-    expect(state.winner).toBe("politician");
-    expect(state.events.some((event) => event.message.includes("৳8,000"))).toBe(true);
-  });
-
-  it("counts active Politician leases toward the seven-property control victory", () => {
-    let state = createNewGame({ humanRole: "politician" });
-    const ids = Object.keys(state.properties).slice(0, 7);
-    state = {
-      ...state,
-      properties: Object.fromEntries(Object.entries(state.properties).map(([id, property], index) => [
-        id,
-        ids.includes(id)
-          ? { ...property, ownerId: null, leaseholderId: "player-1" }
-          : property,
-      ])),
-    };
-    state = movePlayer(state, "player-1", 1);
-    expect(state.phase).toBe("game-over");
-    expect(state.winner).toBe("politician");
-    expect(state.events.some((event) => event.message.includes("controlling at least seven properties"))).toBe(true);
-  });
-
-  it("ends the game when the Politician controls seven properties", () => {
-    let state = createNewGame({ humanRole: "politician" });
-    const ids = Object.keys(state.properties).slice(0, 7);
-    state = { ...state, properties: Object.fromEntries(Object.entries(state.properties).map(([id, property]) => [id, ids.includes(id) ? { ...property, ownerId: "player-1" } : property])) };
-    state = movePlayer(state, "player-1", 1);
-    expect(state.phase).toBe("game-over");
-    expect(state.winner).toBe("politician");
-  });
-
 });

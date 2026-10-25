@@ -59,7 +59,8 @@ Each action validates phase, actor, ownership, and affordability; computes befor
 - Every transfer names source/destination.
 - Public and cooperative funds are distinct.
 - Ownership and leaseholder are distinct; no double rent payout.
-- Cooperative property counted once for victory.
+- Cooperative property is tracked separately from individual owners and never double counted.
+- Victory: the game ends when exactly one player is not bankrupt; `winner` holds that player's id.
 - Bankrupt players do not take normal turns.
 - Game-over state is terminal.
 - AI can select only from engine-generated legal actions and receives no hidden-state access.

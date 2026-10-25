@@ -2,12 +2,12 @@
 
 A satirical, Bangladesh-inspired property board game: **The people pay. The powerful play.**
 
-A single human plays against three computer-controlled opponents. Each game has exactly four seats: one Politician and three Citizens. The intentionally unequal rules parody patronage, rent-seeking, and public-service failures. Citizens can win only by cooperating, including when their seats are AI-controlled.
+A single human plays against three computer-controlled opponents. Each game has exactly four seats: one Politician and three Citizens. The intentionally unequal rules parody patronage, rent-seeking, and public-service failures. The game is won by being the last player not bankrupt; Citizens may help each other through a shared cooperative fund.
 
 > Fictional political satire. Use fictional composites; do not imply allegations about specific real people.
 
 ## Status
-**Playable systems implemented so far:** role selection, 40-space fictional board, role-based dice and GO rewards; property buy/lease/decline; ownership, rent, railroads and utilities; 32 role-specific cards; public/cooperative fund transfers; skipped turns and extra rolls; automatic mortgage fallback and bankruptcy outcomes. The game now includes cooperative contributions, shared-property purchases and rent, Charter voting, and initial Politician/Citizen victory checks. Houses/hotels, mortgages with redemption, and property sales are also implemented for the human player. Remaining work includes full playtesting, card-choice UI, shuffled decks, AI building/redemption, the doubles bonus roll, and balance tuning (in seeded all-AI simulations the Politician currently wins every game).
+**Playable systems implemented so far:** role selection, 40-space fictional board, role-based dice and GO rewards; property buy/lease/decline; ownership, rent, railroads and utilities; 32 role-specific cards; public/cooperative fund transfers; skipped turns and extra rolls; automatic mortgage fallback and bankruptcy outcomes. The game now includes cooperative contributions, shared-property purchases and rent, and a last-player-standing victory rule. Houses/hotels, mortgages with redemption, and property sales are also implemented for the human player. Remaining work includes full playtesting, card-choice UI, shuffled decks, AI building/redemption, the doubles bonus roll, and further balance tuning (in seeded all-AI simulations the Politician now wins about 70% of games, with a median length of ~260 turns; see RD-127).
 
 ## Docs
 - [Product specification](docs/PRODUCT_SPEC.md)
@@ -35,5 +35,5 @@ Checks: `npm run typecheck`, `npm test`, `npm run build`.
 - Centralized, data-driven rules.
 - Explicit and logged money transfers and AI decisions.
 - Integer Bangladeshi taka (৳).
-- Cooperative Citizen victory must be viable.
+- Last player standing wins: the game ends when every other player is bankrupt.
 - Engine owns validation and state transitions.
