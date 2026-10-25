@@ -1,4 +1,4 @@
-import type { BoardSpace } from "./board";
+import type { BoardSpace } from "./board.js";
 export type PlayerRole = "politician" | "citizen";
 export type Controller = "human" | "ai";
 export interface Player {

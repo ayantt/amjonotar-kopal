@@ -18,3 +18,8 @@ jobs:
       - run: npm run typecheck
       - run: npm test
       - run: npm run build
+      - name: Multiplayer deployment smoke test
+        if: ${{ vars.MULTIPLAYER_SMOKE_URL != '' }}
+        env:
+          MULTIPLAYER_SMOKE_URL: ${{ vars.MULTIPLAYER_SMOKE_URL }}
+        run: node scripts/multiplayer-smoke.mjs

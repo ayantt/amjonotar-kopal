@@ -1,11 +1,28 @@
 import { describe, expect, it } from "vitest";
 import { BOARD_SPACE_COUNT } from "../../src/game/board";
 import { GAME_RULES } from "../../src/game/rules";
-import { buyCooperativeProperty, contributeToCooperative, createNewGame, endTurn, getDiceCount, movePlayer, rollDice, rollAndMove, resolvePropertyAction, validateSetup } from "../../src/game/engine";
+import { applyMultiplayerAction, buyCooperativeProperty, contributeToCooperative, createMultiplayerGame, createNewGame, endTurn, getDiceCount, movePlayer, rollDice, rollAndMove, resolvePropertyAction, validateSetup } from "../../src/game/engine";
 import { runAiTurn } from "../../src/game/turns";
 import { getLegalPropertyActions } from "../../src/game/properties";
 
 describe("game setup", () => {
+  it("supports two to six human multiplayer seats and randomly assigns exactly one Politician", () => {
+    const twoPlayers = createMultiplayerGame(["Host", "Guest"], () => 0.99);
+    expect(twoPlayers.players).toHaveLength(2);
+    expect(twoPlayers.players.filter((player) => player.role === "politician").map((player) => player.name)).toEqual(["Guest"]);
+    expect(twoPlayers.players.every((player) => player.controller === "human")).toBe(true);
+
+    const sixPlayers = createMultiplayerGame(["A", "B", "C", "D", "E", "F"], () => 0);
+    expect(sixPlayers.players).toHaveLength(6);
+    expect(sixPlayers.players.filter((player) => player.role === "politician").map((player) => player.name)).toEqual(["A"]);
+    expect(sixPlayers.players.filter((player) => player.role === "citizen")).toHaveLength(5);
+  });
+
+  it("rejects multiplayer games outside the two-to-six player range", () => {
+    expect(() => createMultiplayerGame(["Solo"])).toThrow(/between two and six/);
+    expect(() => createMultiplayerGame(["A", "B", "C", "D", "E", "F", "G"])).toThrow(/between two and six/);
+  });
+
   it("always creates one Politician, three Citizens, one human and three AI seats", () => {
     for (const humanRole of ["politician", "citizen"] as const) {
       const state = createNewGame({ humanRole });
@@ -17,6 +34,33 @@ describe("game setup", () => {
     }
   });
   it("defines exactly 40 board spaces", () => expect(BOARD_SPACE_COUNT).toBe(40));
+});
+
+describe("multiplayer engine entry points", () => {
+  it("creates four human-controlled seats with one Politician and three Citizens", () => {
+    const state = createMultiplayerGame(["Host", "Amina", "Rafi", "Nila"]);
+    expect(state.players.map((player) => player.name)).toEqual(["Host", "Amina", "Rafi", "Nila"]);
+    expect(state.players.filter((player) => player.role === "politician")).toHaveLength(1);
+    expect(state.players.filter((player) => player.role === "citizen")).toHaveLength(3);
+    expect(state.players.every((player) => player.controller === "human")).toBe(true);
+  });
+
+  it("rejects commands from a seat that does not own the current turn", () => {
+    const state = createMultiplayerGame(["Host", "Amina", "Rafi", "Nila"]);
+    expect(() => applyMultiplayerAction(state, "player-2", { type: "roll" }, () => 0)).toThrow("It is not this player's turn.");
+  });
+
+  it("routes valid commands through the existing rules engine", () => {
+    const state = createMultiplayerGame(["Host", "Amina", "Rafi", "Nila"], () => 0);
+    const next = applyMultiplayerAction(state, "player-1", { type: "roll" }, () => 0);
+    expect(next.players[0].lastRoll).toEqual([1, 1]);
+    expect(next.events.some((event) => event.message.includes("rolled 1 + 1 = 2"))).toBe(true);
+  });
+
+  it("rejects commands after the game is over", () => {
+    const state = { ...createMultiplayerGame(["Host", "Amina", "Rafi", "Nila"]), phase: "game-over" as const, winner: "player-1" };
+    expect(() => applyMultiplayerAction(state, "player-1", { type: "roll" }, () => 0)).toThrow("The game has ended.");
+  });
 });
 
 describe("dice and movement", () => {

@@ -9,7 +9,7 @@ A single human plays against three computer-controlled opponents. Each game has 
 ## Status
 **Playable systems implemented so far:** role selection, 40-space fictional board, role-based dice and GO rewards; property buy/lease/decline; ownership, rent, railroads and utilities; 32 role-specific cards; public/cooperative fund transfers; skipped turns and extra rolls; automatic mortgage fallback and bankruptcy outcomes. The game now includes cooperative contributions, shared-property purchases and rent, and a last-player-standing victory rule. Houses/hotels, mortgages with redemption, and property sales are also implemented for the human player. Remaining work includes full playtesting, card-choice UI, shuffled decks, AI building/redemption, the doubles bonus roll, and further balance tuning (in seeded all-AI simulations the Politician now wins about 70% of games, with a median length of ~260 turns; see RD-127).
 
-## Docs
+## Online multiplayer (in progress)\n\nThe `feature/online-multiplayer` branch contains an initial room-code multiplayer implementation: create/join rooms, 2–6 human seats, a randomly assigned Politician and remaining Citizens, server-side turn validation, state-version conflict checks, polling-based synchronization, and a shared game view. It is not enabled on the live site yet. It requires a Postgres database and the server-only `DATABASE_URL` environment variable in Vercel. Rooms expire after 12 hours. See [the multiplayer plan](docs/MULTIPLAYER_PLAN.md). Full browser playtesting and deployment configuration are still required.\n\n## Docs
 - [Product specification](docs/PRODUCT_SPEC.md)
 - [Game rulebook](docs/GAME_RULEBOOK.md)
 - [Card catalog](docs/CARD_CATALOG.md)

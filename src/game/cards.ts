@@ -1,4 +1,4 @@
-import type { PlayerRole } from "./types";
+import type { PlayerRole } from "./types.js";
 export type CardEffect =
  | {kind:"cash";amount:number;recipient:"bank"|"public"|"cooperative"|"public-if-available"|"public-payment-if-available"|"each-citizen"}
  | {kind:"move";steps:number;resolveDestination:boolean}

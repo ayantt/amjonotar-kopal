@@ -1,8 +1,8 @@
-import { BOARD, BOARD_SPACE_COUNT } from "./board";
-import { GAME_RULES } from "./rules";
-import { drawCard, type CardEffect } from "./cards";
-import { countRailroads, createPropertyLedger, getBaseRent, getLegalPropertyActions, isPurchasable, type PropertyAction } from "./properties";
-import type { Controller, GameEvent, GameState, NewGameOptions, Player, PlayerRole } from "./types";
+import { BOARD, BOARD_SPACE_COUNT } from "./board.js";
+import { GAME_RULES } from "./rules.js";
+import { drawCard, type CardEffect } from "./cards.js";
+import { countRailroads, createPropertyLedger, getBaseRent, getLegalPropertyActions, isPurchasable, type PropertyAction } from "./properties.js";
+import type { Controller, GameEvent, GameState, NewGameOptions, Player, PlayerRole } from "./types.js";
 
 const defaultRandom = () => Math.random();
 function addEvent(state: GameState, message: string, kind: GameEvent["kind"] = "system"): GameState {
@@ -40,14 +40,30 @@ export function buyCooperativeProperty(state: GameState, playerId: string): Game
   next = addEvent(next, `Citizens' cooperative bought ${space.name} for ৳${cost}; future rent goes to the shared fund.`, "money");
   return checkVictory(next);
 }
+function initializeGame(players: Player[], startMessage: string): GameState {
+  const initial: GameState = { schemaVersion: 1, phase: "awaiting-roll", players, currentPlayerIndex: 0, publicFund: 0, cooperativeFund: 0, properties: createPropertyLedger(), cooperativePropertyIds: [], pendingPropertyId: null, cardDrawCounts: { community: 0, chance: 0 }, extraRollAvailable: false, events: [], nextEventId: 1, round: 1, winner: null };
+  const state = addEvent(initial, startMessage);
+  return addEvent(state, `The board has ${BOARD_SPACE_COUNT} spaces. All players begin at Shurur Line.`);
+}
 export function createNewGame({ humanRole }: NewGameOptions): GameState {
   const roles: PlayerRole[] = ["politician", "citizen", "citizen", "citizen"];
   const humanIndex = humanRole === "politician" ? 0 : 1;
   const names = ["The Honourable Leader", "Kamal", "Joshim", "Shabana"];
   const players = roles.map((role, index) => makePlayer(`player-${index + 1}`, index === humanIndex ? "You" : (role === "politician" ? "The Honourable Leader" : names[index]), role, index === humanIndex ? "human" : "ai"));
-  const initial: GameState = { schemaVersion: 1, phase: "awaiting-roll", players, currentPlayerIndex: 0, publicFund: 0, cooperativeFund: 0, properties: createPropertyLedger(), cooperativePropertyIds: [], pendingPropertyId: null, cardDrawCounts: { community: 0, chance: 0 }, extraRollAvailable: false, events: [], nextEventId: 1, round: 1, winner: null };
-  const state = addEvent(initial, `Game started. You play as ${humanRole === "politician" ? "Politician" : "Citizen"}; three opponents are computer-controlled.`);
-  return addEvent(state, `The board has ${BOARD_SPACE_COUNT} spaces. All players begin at Shurur Line.`);
+  return initializeGame(players, `Game started. You play as ${humanRole === "politician" ? "Politician" : "Citizen"}; three opponents are computer-controlled.`);
+}
+/** Creates a shared game in which each seat is controlled by a connected human client. */
+export function createMultiplayerGame(playerNames: string[], random: () => number = defaultRandom): GameState {
+  if (playerNames.length < 2 || playerNames.length > 6) throw new Error("Online multiplayer requires between two and six players.");
+  const sample = random();
+  if (!(sample >= 0 && sample < 1)) throw new Error("Random source must return a value in [0, 1).");
+  const politicianIndex = Math.floor(sample * playerNames.length);
+  const players = playerNames.map((rawName, index) => {
+    const name = rawName.trim().slice(0, 24);
+    if (!name) throw new Error("Every multiplayer seat needs a display name.");
+    return makePlayer(`player-${index + 1}`, name, index === politicianIndex ? "politician" : "citizen", "human");
+  });
+  return initializeGame(players, `Online multiplayer game started with ${players.length} players. ${players[politicianIndex].name} was randomly selected as Politician; everyone else is a Citizen.`);
 }
 export function rollDice(count: number, random: () => number = defaultRandom): number[] {
   if (!Number.isInteger(count) || count < 1) throw new Error("Dice count must be a positive integer.");
@@ -550,4 +566,55 @@ export function validateSetup(state: GameState): boolean {
   return state.players.length === 4 && state.players.filter((p) => p.role === "politician").length === 1 &&
     state.players.filter((p) => p.role === "citizen").length === 3 && state.players.filter((p) => p.controller === "human").length === 1 &&
     state.players.filter((p) => p.controller === "ai").length === 3;
+}
+
+export type MultiplayerAction =
+  | { type: "roll" }
+  | { type: "property"; action: PropertyAction }
+  | { type: "build"; spaceId: string; building: BuildingAction }
+  | { type: "mortgage"; spaceId: string }
+  | { type: "redeem-mortgage"; spaceId: string }
+  | { type: "sell-property"; spaceId: string }
+  | { type: "contribute"; amount: number }
+  | { type: "buy-cooperative-property" }
+  | { type: "end-turn" };
+
+/**
+ * Applies one validated multiplayer command through the existing game engine.
+ * Callers must authenticate the seat separately; this function enforces turn ownership.
+ */
+export function applyMultiplayerAction(
+  state: GameState,
+  playerId: string,
+  action: MultiplayerAction,
+  random: () => number = defaultRandom,
+): GameState {
+  if (state.phase === "game-over") throw new Error("The game has ended.");
+  const current = getCurrentPlayer(state);
+  if (current.id !== playerId) throw new Error("It is not this player's turn.");
+  if (current.controller !== "human") throw new Error("This seat is not controlled by a human player.");
+  switch (action.type) {
+    case "roll":
+      return rollAndMove(state, random);
+    case "property":
+      return resolvePropertyAction(state, action.action);
+    case "build":
+      return buildProperty(state, playerId, action.spaceId, action.building);
+    case "mortgage":
+      return mortgageProperty(state, playerId, action.spaceId);
+    case "redeem-mortgage":
+      return redeemMortgage(state, playerId, action.spaceId);
+    case "sell-property":
+      return sellProperty(state, playerId, action.spaceId);
+    case "contribute":
+      return contributeToCooperative(state, playerId, action.amount);
+    case "buy-cooperative-property":
+      return buyCooperativeProperty(state, playerId);
+    case "end-turn":
+      return endTurn(state);
+    default: {
+      const exhaustive: never = action;
+      throw new Error(`Unsupported multiplayer action: ${String(exhaustive)}`);
+    }
+  }
 }

@@ -1,0 +1,8 @@
+{
+  "rewrites": [
+    {
+      "source": "/api/multiplayer/:path*",
+      "destination": "/api/multiplayer?path=:path*"
+    }
+  ]
+}

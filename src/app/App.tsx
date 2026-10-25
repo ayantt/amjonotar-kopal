@@ -3,6 +3,9 @@ import { BOARD } from "../game/board";
 import { buildProperty, buyCooperativeProperty, contributeToCooperative, createNewGame, endTurn, getBuildingCost, getCurrentPlayer, getMortgageTerms, isHumanTurn, mortgageProperty, redeemMortgage, resolvePropertyAction, rollAndMove, sellProperty, validateSetup } from "../game/engine";
 import { runAiTurn } from "../game/turns";
 import { getBaseRent, getLegalPropertyActions } from "../game/properties";
+import { MultiplayerLobby } from "./MultiplayerLobby";
+import { BoardView } from "./BoardView";
+import { EventLog } from "./EventLog";
 import type { GameState, PlayerRole } from "../game/types";
 
 
@@ -48,6 +51,7 @@ const money = (amount: number) => `৳${amount.toLocaleString("en-BD")}`;
 const roleName = (role: PlayerRole) => role === "politician" ? "Politician" : "Citizen";
 export function App() {
   const [game, setGame] = useState<GameState | null>(null);
+  const [showMultiplayer, setShowMultiplayer] = useState(false);
   const [busy, setBusy] = useState(false);
   const [soundEnabled, setSoundEnabled] = useState(true);
   const victorySoundPlayed = useRef(false);
@@ -203,6 +207,8 @@ export function App() {
     setLastAction("Choose your role to start a new game.");
   }
 
+  if (!game && showMultiplayer) return <MultiplayerLobby onBack={() => setShowMultiplayer(false)} />;
+
   if (!game) return <main className="app-shell">
     <header className="masthead"><span className="seal">আ</span><span>PiStack POLITICS CLUB</span><span className="masthead-right">BOARD GAME NO. 01</span></header>
     <section className="hero">
@@ -214,8 +220,9 @@ export function App() {
         <button className="role-card politician-card" onClick={() => startGame("politician")}><span className="role-number">01 / POWER</span><strong>Play as Politician</strong><span>Two dice. Special privileges. Keep the system on your side.</span><span className="button-copy">TAKE THE CHAIR ↗</span></button>
         <button className="role-card citizen-card" onClick={() => startGame("citizen")}><span className="role-number">02 / PEOPLE</span><strong>Play as Citizen</strong><span>One die. Three citizens. Your best chance is to work together.</span><span className="button-copy">JOIN THE PUBLIC ↗</span></button>
       </div>
+      <button className="multiplayer-entry" onClick={() => setShowMultiplayer(true)}><span><strong>PLAY WITH FRIENDS</strong><small>Online multiplayer · room code · four human players</small></span><b>CREATE / JOIN ROOM ↗</b></button>
     </section>
-    <footer className="site-footer"><span>FICTIONAL POLITICAL SATIRE</span><span>4 SEATS · 1 HUMAN · 3 AI</span></footer>
+    <footer className="site-footer"><span>FICTIONAL POLITICAL SATIRE</span><span>4 SEATS · SINGLE-PLAYER OR ONLINE</span></footer>
   </main>;
 
   const current = getCurrentPlayer(game);
@@ -236,7 +243,6 @@ export function App() {
     return level >= selectedDevelopmentLevel;
   }));
 
-  const isPurchasableSpace = (type: string) => ["property", "railroad", "utility"].includes(type);
   return <main className="game-shell">
     <header className="game-header">
       <button className="wordmark" onClick={restart} aria-label="Return to role selection">আমজনতার কপাল<span>BACK TO MENU ↗</span></button>
@@ -265,50 +271,30 @@ export function App() {
     <section className="game-intro"><div><p className="eyebrow">THE PEOPLE PAY. THE POWERFUL PLAY.</p><h1>The board is <em>rigged.</em></h1></div><p>{busy ? "The computer is making its move…" : lastAction}</p></section>
     {game.phase === "game-over" && <section className="game-over-panel"><strong>GAME OVER</strong><p>{[...game.events].reverse().find((event) => /wins|win\b/i.test(event.message))?.message ?? (game.players.find((player) => player.id === game.winner) ? `${game.players.find((player) => player.id === game.winner)?.name} is the last player standing.` : "The game has ended.")}</p><button className="primary-action" onClick={restart}>Start a new game ↗</button></section>}
     <section className="game-layout">
-    <section className="panel log-panel"><div className="panel-label"><span className="record-title">THE OFFICIAL RECORD <small>RECENT EVENTS</small></span><button className={`event-popup-toggle ${showEventPopups ? "is-on" : ""}`} type="button" aria-pressed={showEventPopups} onClick={() => {
-      const next = !showEventPopups;
-      setShowEventPopups(next);
-      if (!next) {
-        setDisplayedEvents(game.events);
-        setEventQueue([]);
-        setActiveEvent(null);
-      }
-    }}>POPUPS {showEventPopups ? "ON" : "OFF"}</button></div><div className="event-list">{[...displayedEvents].reverse().map((event) => <div className={`event event-${event.kind}`} key={event.id}><span>{String(event.id).padStart(3,"0")}</span><p>{event.message}</p></div>)}</div></section>
-      <div className="board-wrap">
-        <div className="board-heading"><span>THE REPUBLIC OF OPPORTUNITY</span><span className="board-heading-actions"><span>40 SPACES</span><button className="fullscreen-button" onClick={toggleFullscreen} aria-label={isFullscreen ? "Exit fullscreen" : "Enter fullscreen"}>{isFullscreen ? "EXIT FULLSCREEN ↙" : "FULLSCREEN ↗"}</button></span></div>
-        <div className="board-grid">
-          {BOARD.map((space, index) => {
-            const occupants = game.players.filter((player) => player.position === index);
-            const edge = index <= 10
-              ? { gridColumn: 11 - index, gridRow: 11 }
-              : index <= 19
-                ? { gridColumn: 1, gridRow: 21 - index }
-                : index <= 30
-                  ? { gridColumn: index - 19, gridRow: 1 }
-                  : { gridColumn: 11, gridRow: index - 29 };
-            return <div style={edge} className={`space space-${space.type} ${space.color ? `color-${space.color}` : ""} ${isPurchasableSpace(space.type) ? "space-clickable" : ""}`} key={space.id} role={isPurchasableSpace(space.type) ? "button" : undefined} tabIndex={isPurchasableSpace(space.type) ? 0 : undefined} aria-label={isPurchasableSpace(space.type) ? `View details for ${space.name}` : undefined} onClick={isPurchasableSpace(space.type) ? () => setSelectedPropertyId(space.id) : undefined} onKeyDown={isPurchasableSpace(space.type) ? (event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); setSelectedPropertyId(space.id); } } : undefined}>
-              <strong>{space.name}</strong>
-              {space.price !== undefined && <span className="space-price">{money(space.price)}</span>}
-              {game.cooperativePropertyIds.includes(space.id) && <small className="ownership-tag">OWN: CITIZENS CO-OP</small>}{game.properties[space.id]?.ownerId && <small className="ownership-tag">OWN: {game.players.find((player) => player.id === game.properties[space.id].ownerId)?.name ?? "Unknown"}</small>}{game.properties[space.id]?.mortgaged && <small className="ownership-tag">MORTGAGED</small>}{(game.properties[space.id]?.houses ?? 0) > 0 && <small className="ownership-tag">HOUSES: {game.properties[space.id].houses}</small>}{game.properties[space.id]?.hotel && <small className="ownership-tag">HOTEL · 6× RENT</small>}
-              {game.properties[space.id]?.leaseholderId && <small className="ownership-tag">LEASE: {game.players.find((player) => player.id === game.properties[space.id].leaseholderId)?.role === "politician" ? "Leader" : game.players.find((player) => player.id === game.properties[space.id].leaseholderId)?.name ?? "Unknown"}</small>}
-              {occupants.length > 0 && <div className="tokens">{occupants.map((player) => <span title={`${player.name} · ${roleName(player.role)}`} key={player.id} className={`token ${player.role} ${player.controller} player-color-${player.id}`}>{player.controller === "human" ? "YOU" : player.role === "politician" ? "P" : player.name.slice(0,1)}</span>)}</div>}
-            </div>;
-          })}
-          <div className="board-center">
-            <span className="center-kicker">THE REPUBLIC OF OPPORTUNITY</span>
-            <strong>আমজনতার <em>কপাল</em></strong>
-            <span className="center-stamp">THE BOARD<br />IS RIGGED</span>
-            <span className="center-caption">FORTY SPACES · FOUR SEATS · ONE CROOKED SYSTEM</span>
-            <div className="center-status">{current.name} · {roleName(current.role)} · {money(current.cash)}</div>
-          </div>
-        </div>
-        {showEventPopups && activeEvent && <div className={`board-event-popup event-popup-${activeEvent.kind}`} role="status" aria-live="polite" key={activeEvent.id}>
-          <span className="board-event-kicker">OFFICIAL RECORD · EVENT {String(activeEvent.id).padStart(3, "0")}</span>
-          <p>{activeEvent.message}</p>
-          <button type="button" aria-label="Dismiss event" onClick={() => setActiveEvent(null)}>DISMISS ×</button>
-        </div>}
-      </div>
-      <aside className="sidebar">
+    <EventLog
+      events={displayedEvents}
+      popupsEnabled={showEventPopups}
+      onTogglePopups={() => {
+        const next = !showEventPopups;
+        setShowEventPopups(next);
+        if (!next) {
+          setDisplayedEvents(game.events);
+          setEventQueue([]);
+          setActiveEvent(null);
+        }
+      }}
+    />
+            <BoardView
+        game={game}
+        current={current}
+        isFullscreen={isFullscreen}
+        showEventPopup={showEventPopups}
+        activeEvent={activeEvent}
+        onSelectProperty={setSelectedPropertyId}
+        onToggleFullscreen={toggleFullscreen}
+        onDismissEvent={() => setActiveEvent(null)}
+      />
+            <aside className="sidebar">
         <section className="panel current-panel"><div className="panel-label">NOW PLAYING</div><div className="current-player"><span className={`large-token ${current.role} player-color-${current.id}`}>{current.controller === "human" ? "YOU" : current.role === "politician" ? "P" : current.name.slice(0,1)}</span><div><h2>{current.name}</h2><p>{roleName(current.role)} · {current.controller === "human" ? "Human player" : "Computer opponent"}</p></div></div><div className="cash-line"><span>AVAILABLE CASH</span><strong>{money(current.cash)}</strong></div>
           {current.controller === "human" && game.pendingPropertyId && <div className="property-decision"><div className="panel-label">PROPERTY DECISION</div><strong>{BOARD.find((space) => space.id === game.pendingPropertyId)?.name}</strong><p>Choose what to do with this unclaimed space.</p>{propertyActions.map((action) => <button className={action.type === "decline" ? "secondary-action" : "primary-action"} key={action.type} onClick={() => { act((state) => resolvePropertyAction(state, action.type)); playSound(action.type === "decline" ? "turn" : "money", soundEnabled); }}>{action.label}<span>{action.type === "decline" ? "↷" : money(action.cost)}</span></button>)}{current.role === "citizen" && game.cooperativeFund >= (BOARD.find((space) => space.id === game.pendingPropertyId)?.price ?? Infinity) && <button className="secondary-action" onClick={() => { act((state) => buyCooperativeProperty(state, current.id)); playSound("money", soundEnabled); }}>Buy for Citizens co-op <span>{money(BOARD.find((space) => space.id === game.pendingPropertyId)?.price ?? 0)}</span></button>}</div>}
           {current.controller === "human" ? <div className="actions"><button className="primary-action" onClick={roll} disabled={busy || game.phase !== "awaiting-roll"}>Roll {current.role === "politician" ? "two dice" : "one die"} <span>↗</span></button><button className="secondary-action" onClick={finishTurn} disabled={busy || game.phase !== "awaiting-end-turn" || Boolean(game.pendingPropertyId)}>End turn →</button></div> : <p className="ai-note">{busy ? "Thinking through the next move…" : "Computer turn will begin shortly."}</p>}
