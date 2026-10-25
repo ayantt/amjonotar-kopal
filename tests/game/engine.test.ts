@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { BOARD_SPACE_COUNT } from "../../src/game/board";
-import { buyCooperativeProperty, contributeToCooperative, createNewGame, endTurn, getDiceCount, movePlayer, rollDice, rollAndMove, resolvePropertyAction, validateSetup, voteForCharter } from "../../src/game/engine";
+import { applyMultiplayerAction, buyCooperativeProperty, contributeToCooperative, createMultiplayerGame, createNewGame, endTurn, getDiceCount, movePlayer, rollDice, rollAndMove, resolvePropertyAction, validateSetup, voteForCharter } from "../../src/game/engine";
 import { runAiTurn } from "../../src/game/turns";
 import { getLegalPropertyActions } from "../../src/game/properties";
 
@@ -16,6 +16,33 @@ describe("game setup", () => {
     }
   });
   it("defines exactly 40 board spaces", () => expect(BOARD_SPACE_COUNT).toBe(40));
+});
+
+describe("multiplayer engine entry points", () => {
+  it("creates four human-controlled seats with one Politician and three Citizens", () => {
+    const state = createMultiplayerGame(["Host", "Amina", "Rafi", "Nila"]);
+    expect(state.players.map((player) => player.name)).toEqual(["Host", "Amina", "Rafi", "Nila"]);
+    expect(state.players.filter((player) => player.role === "politician")).toHaveLength(1);
+    expect(state.players.filter((player) => player.role === "citizen")).toHaveLength(3);
+    expect(state.players.every((player) => player.controller === "human")).toBe(true);
+  });
+
+  it("rejects commands from a seat that does not own the current turn", () => {
+    const state = createMultiplayerGame(["Host", "Amina", "Rafi", "Nila"]);
+    expect(() => applyMultiplayerAction(state, "player-2", { type: "roll" }, () => 0)).toThrow("It is not this player's turn.");
+  });
+
+  it("routes valid commands through the existing rules engine", () => {
+    const state = createMultiplayerGame(["Host", "Amina", "Rafi", "Nila"]);
+    const next = applyMultiplayerAction(state, "player-1", { type: "roll" }, () => 0);
+    expect(next.players[0].lastRoll).toEqual([1, 1]);
+    expect(next.events.some((event) => event.message.includes("rolled 1 + 1 = 2"))).toBe(true);
+  });
+
+  it("rejects commands after the game is over", () => {
+    const state = { ...createMultiplayerGame(["Host", "Amina", "Rafi", "Nila"]), phase: "game-over" as const, winner: "citizens" };
+    expect(() => applyMultiplayerAction(state, "player-1", { type: "roll" }, () => 0)).toThrow("The game has ended.");
+  });
 });
 
 describe("dice and movement", () => {
