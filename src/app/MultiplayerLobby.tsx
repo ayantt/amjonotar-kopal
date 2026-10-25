@@ -1,7 +1,9 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { BOARD } from "../game/board";
 import { getLegalPropertyActions } from "../game/properties";
-import { getBuildingCost } from "../game/engine";
+import { BoardView } from "./BoardView";
+import { EventLog } from "./EventLog";
+import { PropertyModal } from "./PropertyModal";
 import type { GameState } from "../game/types";
 
 type PublicSeat = { playerId: string; name: string; role: "politician" | "citizen" | null; joinedAt: string };
@@ -25,6 +27,17 @@ export function MultiplayerLobby({ onBack }: { onBack: () => void }) {
   const [error, setError] = useState("");
   const [working, setWorking] = useState(false);
   const [notice, setNotice] = useState("Create a room or join friends with a room code.");
+  const [selectedPropertyId, setSelectedPropertyId] = useState<string | null>(null);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  const [showEventPopups, setShowEventPopups] = useState(true);
+  const [activeEvent, setActiveEvent] = useState<GameState["events"][number] | null>(null);
+  const lastSeenEventId = useRef<number | null>(null);
+
+  useEffect(() => {
+    const syncFullscreen = () => setIsFullscreen(Boolean(document.fullscreenElement));
+    document.addEventListener("fullscreenchange", syncFullscreen);
+    return () => document.removeEventListener("fullscreenchange", syncFullscreen);
+  }, []);
 
   const saveCredentials = useCallback((value: Credentials | null) => {
     setCredentials(value);
@@ -51,10 +64,40 @@ export function MultiplayerLobby({ onBack }: { onBack: () => void }) {
     return () => window.clearInterval(timer);
   }, [credentials, refresh, working]);
 
+  useEffect(() => {
+    const events = room?.state?.events ?? [];
+    if (events.length === 0) return;
+    const latest = events[events.length - 1];
+    if (lastSeenEventId.current === null) {
+      lastSeenEventId.current = latest.id;
+      return;
+    }
+    if (latest.id <= lastSeenEventId.current) return;
+    lastSeenEventId.current = latest.id;
+    if (!showEventPopups) return;
+    setActiveEvent(latest);
+  }, [room?.state?.events, showEventPopups]);
+
+  useEffect(() => {
+    if (!activeEvent || !showEventPopups) return;
+    const eventId = activeEvent.id;
+    const timer = window.setTimeout(() => setActiveEvent((active) => active?.id === eventId ? null : active), 2600);
+    return () => window.clearTimeout(timer);
+  }, [activeEvent, showEventPopups]);
+
   const current = room?.state?.players[room.state.currentPlayerIndex];
   const isMyTurn = Boolean(current && credentials && current.id === credentials.playerId && room?.status === "active");
   const legalActions = useMemo(() => room?.state && current ? getLegalPropertyActions(room.state, current) : [], [room?.state, current]);
-  const pendingName = room?.state?.pendingPropertyId ? BOARD.find((space) => space.id === room?.state?.pendingPropertyId)?.name : undefined;
+  const pendingSpace = room?.state?.pendingPropertyId ? BOARD.find((space) => space.id === room?.state?.pendingPropertyId) : undefined;
+  const selectedSpace = selectedPropertyId ? BOARD.find((space) => space.id === selectedPropertyId) : undefined;
+  const selectedProperty = selectedSpace && room?.state ? room.state.properties[selectedSpace.id] : undefined;
+  const selectedColorGroup = selectedSpace?.color ? BOARD.filter((space) => space.type === "property" && space.color === selectedSpace.color) : [];
+  const selectedDevelopmentLevel = selectedProperty?.hotel ? 4 : selectedProperty?.houses ?? 0;
+  const citizenCanBuildSelected = Boolean(current && room?.state && (current.role === "politician" || (selectedColorGroup.length > 0 && selectedColorGroup.every((space) => {
+    const property = room.state!.properties[space.id];
+    const level = property?.hotel ? 4 : property?.houses ?? 0;
+    return property?.ownerId === current.id && !property.mortgaged && !property.leaseholderId && !room.state!.cooperativePropertyIds.includes(space.id) && level >= selectedDevelopmentLevel;
+  }))));
 
   async function createRoom() {
     setWorking(true); setError("");
@@ -133,24 +176,39 @@ export function MultiplayerLobby({ onBack }: { onBack: () => void }) {
         return <div className="multiplayer-seat" key={index}><span className="role-number">SEAT 0{index + 1} · {room.status === "waiting" ? "ROLE DRAW AT START" : (seat?.role ?? "PLAYER").toUpperCase()}</span><strong>{seat?.name ?? "Waiting for player…"}</strong><small>{seat ? (seat.playerId === credentials.playerId ? "YOU" : seat.playerId === room.hostPlayerId ? "HOST" : "CONNECTED") : "OPEN SEAT"}</small></div>;
       })}</div>
       {room.status === "waiting" && <div className="multiplayer-actions">{credentials.playerId === room.hostPlayerId ? <button className="primary-action" disabled={working || room.seats.length < 2} onClick={() => void hostStart()}>{room.seats.length >= 2 ? "START GAME" : "WAITING FOR 1 MORE PLAYER"}</button> : <p>Waiting for the host to start with at least 2 players. Keep this page open.</p>}</div>}
-      {room.state && <div className="multiplayer-game">
-        <div className="multiplayer-room-heading"><div><span className="eyebrow">ROUND {room.state.round}</span><h2>{room.status === "finished" ? "GAME OVER" : current ? `${current.name}'s turn` : "Game in progress"}</h2></div><span className="multiplayer-version">STATE v{room.version}</span></div>
-        {room.state.phase === "game-over" && <p className="multiplayer-result">{room.state.winner === "citizens" ? "The Citizens win together." : "The Politician wins."}</p>}
-        <div className="multiplayer-scoreboard">{room.state.players.map((player) => <div className={player.id === current?.id ? "multiplayer-player is-current" : "multiplayer-player"} key={player.id}><strong>{player.name}</strong><span>{player.role.toUpperCase()}</span><b>{money(player.cash)}</b><small>SPACE {player.position + 1} · {player.bankrupt ? "BANKRUPT" : player.id === credentials.playerId ? "YOUR SEAT" : "CONNECTED"}</small></div>)}</div>
-        {isMyTurn && room.state.phase === "awaiting-roll" && <button className="primary-action" disabled={working} onClick={() => void submitAction({ type: "roll" })}>ROLL DICE</button>}
-        {isMyTurn && room.state.pendingPropertyId && <div className="multiplayer-actions"><p>Unclaimed property: <strong>{pendingName}</strong></p>{legalActions.map((action) => <button className="secondary-action" disabled={working} key={action.type} onClick={() => void submitAction({ type: "property", action: action.type })}>{action.type.toUpperCase()} {action.cost ? `· ${money(action.cost)}` : ""}</button>)}</div>}
-        {isMyTurn && current?.role === "citizen" && <div className="multiplayer-actions"><button className="secondary-action" disabled={working || current.cash < 100} onClick={() => void submitAction({ type: "contribute", amount: 100 })}>CONTRIBUTE ৳100</button><button className="secondary-action" disabled={working || current.cash < 500} onClick={() => void submitAction({ type: "contribute", amount: 500 })}>CONTRIBUTE ৳500</button><button className="secondary-action" disabled={working || room.state!.cooperativeFund < 1000 || room.state!.charterVotes.includes(current.id) || room.state!.charterPendingRound !== null || room.state!.charterActivated} onClick={() => void submitAction({ type: "vote-charter" })}>VOTE FOR CHARTER</button></div>}
-        {isMyTurn && current && <div className="multiplayer-owned"><h3>YOUR PROPERTY REGISTER</h3>{BOARD.filter((space) => room.state?.properties[space.id]?.ownerId === current.id).map((space) => {
-          const property = room.state!.properties[space.id];
-          return <div className="multiplayer-owned-row" key={space.id}><div><strong>{space.name}</strong><small>{property.mortgaged ? "MORTGAGED" : property.hotel ? "HOTEL" : (property.houses ?? 0) ? `${property.houses} HOUSE(S)` : "NO DEVELOPMENT"}</small></div><div className="multiplayer-actions">
-            {space.type === "property" && !property.mortgaged && !property.hotel && <button className="secondary-action" disabled={working || current.cash < getBuildingCost(current.role, "house", property.houses ?? 0) || (property.houses ?? 0) >= 3} onClick={() => void submitAction({ type: "build", spaceId: space.id, building: "house" })}>HOUSE · {money(getBuildingCost(current.role, "house", property.houses ?? 0))}</button>}
-            {space.type === "property" && !property.mortgaged && !property.hotel && (current.role === "politician" || (property.houses ?? 0) === 3) && <button className="secondary-action" disabled={working || current.cash < getBuildingCost(current.role, "hotel", property.houses ?? 0)} onClick={() => void submitAction({ type: "build", spaceId: space.id, building: "hotel" })}>HOTEL · {money(getBuildingCost(current.role, "hotel", property.houses ?? 0))}</button>}
-            {property.mortgaged ? <button className="secondary-action" disabled={working} onClick={() => void submitAction({ type: "redeem-mortgage", spaceId: space.id })}>REDEEM</button> : <button className="secondary-action" disabled={working || Boolean(property.leaseholderId)} onClick={() => void submitAction({ type: "mortgage", spaceId: space.id })}>MORTGAGE</button>}
-            {property.leaseholderId === null && !property.mortgaged && !room.state!.cooperativePropertyIds.includes(space.id) && <button className="secondary-action" disabled={working} onClick={() => void submitAction({ type: "sell-property", spaceId: space.id })}>SELL</button>}
-          </div></div>;
-        })}{BOARD.every((space) => room.state?.properties[space.id]?.ownerId !== current.id) && <p>You do not own any properties yet.</p>}</div>}
-        {isMyTurn && room.state.phase === "awaiting-end-turn" && !room.state.pendingPropertyId && <button className="primary-action" disabled={working} onClick={() => void submitAction({ type: "end-turn" })}>{room.state.extraRollAvailable ? "TAKE EXTRA ROLL" : "END TURN"}</button>}
-        <div className="multiplayer-events"><h3>GAME EVENTS</h3>{room.state.events.slice(-8).reverse().map((event) => <p key={event.id}>{event.message}</p>)}</div>
+      {room.state && current && <div className="multiplayer-game game-shell multiplayer-board-shell">
+        <div className="game-header multiplayer-active-header">
+          <div className="wordmark">আমজনতার কপাল<span>ONLINE REPUBLIC · ROOM {room.code}</span></div>
+          <div className="turn-pill"><span className={isMyTurn ? "pulse-dot" : "pulse-dot ai-dot"} />{room.status === "finished" ? "GAME OVER" : isMyTurn ? "YOUR TURN" : `${current.name.toUpperCase()}'S TURN`} · ROUND {room.state.round}</div>
+          <div className="header-actions"><button className="reset-button" onClick={() => void refresh()}>SYNC ↻</button></div>
+        </div>
+        {room.state.phase === "game-over" && <section className="game-over-panel"><strong>GAME OVER</strong><p>{[...room.state.events].reverse().find((event) => /wins|win\\b/i.test(event.message))?.message ?? (room.state.winner === "citizens" ? "The Citizens win together." : "The Politician wins.")}</p></section>}
+        <section className="game-intro"><div><p className="eyebrow">THE PEOPLE PAY. THE POWERFUL PLAY.</p><h1>The board is <em>rigged.</em></h1></div><p>{working ? "Synchronizing with the room…" : isMyTurn ? "Your seat is active. Actions are validated by the game server." : `Waiting for ${current.name} to complete their turn.`}</p></section>
+        <section className="game-layout">
+          <EventLog events={room.state.events} popupsEnabled={showEventPopups} onTogglePopups={() => { setShowEventPopups((enabled) => !enabled); setActiveEvent(null); }} />
+          <BoardView game={room.state} current={current} localPlayerId={credentials.playerId} isFullscreen={isFullscreen} showEventPopup={showEventPopups} activeEvent={activeEvent} onSelectProperty={setSelectedPropertyId} onToggleFullscreen={async () => {
+            try {
+              if (document.fullscreenElement) await document.exitFullscreen();
+              else await document.querySelector(".multiplayer-board-shell")?.requestFullscreen?.();
+            } catch { setError("Fullscreen is not available in this browser."); }
+          }} onDismissEvent={() => setActiveEvent(null)} />
+          <aside className="sidebar">
+            <section className="panel current-panel"><div className="panel-label">NOW PLAYING</div>
+              <div className="current-player"><span className={`large-token ${current.role} player-color-player-${room.state.players.findIndex((player) => player.id === current.id) + 1}`}>{current.role === "politician" ? "P" : current.name.slice(0,1)}</span><div><h2>{current.name}</h2><p>{current.role === "politician" ? "Politician" : "Citizen"} · {current.id === credentials.playerId ? "Your seat" : "Online player"}</p></div></div>
+              <div className="cash-line"><span>AVAILABLE CASH</span><strong>{money(current.cash)}</strong></div>
+              {isMyTurn && room.state.phase === "awaiting-roll" && <button className="primary-action" disabled={working} onClick={() => void submitAction({ type: "roll" })}>ROLL {current.role === "politician" ? "TWO DICE" : "ONE DIE"} <span>↗</span></button>}
+              {isMyTurn && room.state.pendingPropertyId && <div className="property-decision"><div className="panel-label">PROPERTY DECISION</div><strong>{pendingSpace?.name ?? room.state.pendingPropertyId}</strong><p>Choose what to do with this unclaimed space.</p>{legalActions.map((action) => <button className={action.type === "decline" ? "secondary-action" : "primary-action"} key={action.type} disabled={working} onClick={() => void submitAction({ type: "property", action: action.type })}>{action.label}<span>{action.type === "decline" ? "↷" : money(action.cost)}</span></button>)}{current.role === "citizen" && room.state.charterPendingRound === null && room.state.cooperativeFund >= (pendingSpace?.price ?? Infinity) && <button className="secondary-action" disabled={working} onClick={() => void submitAction({ type: "buy-cooperative-property" })}>BUY FOR CITIZENS' CO-OP <span>{money(pendingSpace?.price ?? 0)}</span></button>}</div>}
+              {isMyTurn && room.state.phase === "awaiting-end-turn" && !room.state.pendingPropertyId && <button className="primary-action" disabled={working} onClick={() => void submitAction({ type: "end-turn" })}>{room.state.extraRollAvailable ? "TAKE EXTRA ROLL" : "END TURN →"}</button>}
+              {!isMyTurn && room.state.phase !== "game-over" && <p className="ai-note">Waiting for the active player. This board updates automatically.</p>}
+            </section>
+            <section className="panel players-panel"><div className="panel-label">PLAYERS IN THIS ROOM</div>{room.state.players.map((player, seatIndex) => <div className={`player-row ${player.id === current.id ? "selected" : ""}`} key={player.id}><span className={`mini-token ${player.role} player-color-player-${seatIndex + 1}`}>{player.role === "politician" ? "P" : player.name.slice(0,1)}</span><div className="player-row-name"><strong>{player.name}</strong><small>{player.role.toUpperCase()} · {player.id === credentials.playerId ? "YOU" : "ONLINE"}{player.bankrupt ? " · BANKRUPT" : ""}</small></div><strong className="player-cash">{money(player.cash)}</strong><small className="position-label">#{player.position}</small></div>)}</section>
+            <section className="panel funds-panel"><div className="panel-label">THE COMMON POOL</div><div className="fund-row"><span>Public treasury</span><strong>{money(room.state.publicFund)}</strong></div><div className="fund-row"><span>Citizens' cooperative</span><strong>{money(room.state.cooperativeFund)}</strong></div>
+              {isMyTurn && current.role === "citizen" && <div className="cooperative-actions"><div className="panel-label">ORGANIZE TOGETHER</div><div className="cooperative-buttons"><button className="secondary-action" disabled={working || current.cash < 100} onClick={() => void submitAction({ type: "contribute", amount: 100 })}>CONTRIBUTE ৳100</button><button className="secondary-action" disabled={working || current.cash < 500} onClick={() => void submitAction({ type: "contribute", amount: 500 })}>CONTRIBUTE ৳500</button></div><button className="primary-action" disabled={working || room.state.charterPendingRound !== null || room.state.charterActivated || room.state.charterVotes.includes(current.id) || room.state.cooperativeFund < 1000} onClick={() => void submitAction({ type: "vote-charter" })}>VOTE FOR PEOPLE'S CHARTER <span>{room.state.charterVotes.length}</span></button></div>}
+              <div className="fund-row"><span>Community cards drawn</span><strong>{room.state.cardDrawCounts.community}/16</strong></div><div className="fund-row"><span>Chance cards drawn</span><strong>{room.state.cardDrawCounts.chance}/16</strong></div>
+            </section>
+          </aside>
+        </section>
+        {selectedSpace && <PropertyModal game={room.state} current={current} selectedSpace={selectedSpace} isCurrentPlayerTurn={isMyTurn} citizenCanBuildSelected={citizenCanBuildSelected} onClose={() => setSelectedPropertyId(null)} onBuild={(spaceId, building) => void submitAction({ type: "build", spaceId, building })} onMortgage={(spaceId) => void submitAction({ type: "mortgage", spaceId })} onRedeem={(spaceId) => void submitAction({ type: "redeem-mortgage", spaceId })} onSell={(spaceId) => void submitAction({ type: "sell-property", spaceId })} />}
       </div>}
       <div className="multiplayer-actions"><button className="secondary-action" onClick={disconnect}>LEAVE THIS DEVICE</button><button className="secondary-action" onClick={() => void refresh()}>REFRESH STATE ↻</button></div>
     </section> : null}
