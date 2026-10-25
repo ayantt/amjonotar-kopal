@@ -1,7 +1,7 @@
 import { randomBytes, createHash } from "node:crypto";
 import type { VercelRequest, VercelResponse } from "@vercel/node";
-import { applyMultiplayerAction, createMultiplayerGame, type MultiplayerAction } from "../src/game/engine";
-import type { GameState } from "../src/game/types";
+import { applyMultiplayerAction, createMultiplayerGame, type MultiplayerAction } from "../src/game/engine.ts";
+import type { GameState } from "../src/game/types.ts";
 
 type NeonSql = ReturnType<typeof import("@neondatabase/serverless").neon>;
 type Seat = { playerId: string; name: string; role: "politician" | "citizen" | null; tokenHash: string; joinedAt: string };
