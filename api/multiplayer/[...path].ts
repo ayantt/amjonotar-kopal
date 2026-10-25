@@ -2,7 +2,8 @@ import { randomBytes, createHash } from "node:crypto";
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 import { neon } from "@neondatabase/serverless";
 import { applyMultiplayerAction, createMultiplayerGame } from "../../src/game/engine";
-import type { GameState, MultiplayerAction } from "../../src/game/engine";
+import type { MultiplayerAction } from "../../src/game/engine";
+import type { GameState } from "../../src/game/types";
 
 type Seat = { playerId: string; name: string; role: "politician" | "citizen"; tokenHash: string; joinedAt: string };
 type RoomRow = { code: string; status: "waiting" | "active" | "finished"; hostPlayerId: string; seats: Seat[]; state: GameState | null; version: number; createdAt: string; expiresAt: string };
