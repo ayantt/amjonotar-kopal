@@ -5,6 +5,7 @@ import { runAiTurn } from "../game/turns";
 import { getBaseRent, getLegalPropertyActions } from "../game/properties";
 import { MultiplayerLobby } from "./MultiplayerLobby";
 import { BoardView } from "./BoardView";
+import { EventLog } from "./EventLog";
 import type { GameState, PlayerRole } from "../game/types";
 
 
@@ -270,16 +271,20 @@ export function App() {
     <section className="game-intro"><div><p className="eyebrow">THE PEOPLE PAY. THE POWERFUL PLAY.</p><h1>The board is <em>rigged.</em></h1></div><p>{busy ? "The computer is making its move…" : lastAction}</p></section>
     {game.phase === "game-over" && <section className="game-over-panel"><strong>GAME OVER</strong><p>{[...game.events].reverse().find((event) => /wins|win\b/i.test(event.message))?.message ?? (game.winner === "politician" ? "The Politician wins." : game.winner === "citizens" ? "The Citizens win together." : "The game has ended.")}</p><button className="primary-action" onClick={restart}>Start a new game ↗</button></section>}
     <section className="game-layout">
-    <section className="panel log-panel"><div className="panel-label"><span className="record-title">THE OFFICIAL RECORD <small>RECENT EVENTS</small></span><button className={`event-popup-toggle ${showEventPopups ? "is-on" : ""}`} type="button" aria-pressed={showEventPopups} onClick={() => {
-      const next = !showEventPopups;
-      setShowEventPopups(next);
-      if (!next) {
-        setDisplayedEvents(game.events);
-        setEventQueue([]);
-        setActiveEvent(null);
-      }
-    }}>POPUPS {showEventPopups ? "ON" : "OFF"}</button></div><div className="event-list">{[...displayedEvents].reverse().map((event) => <div className={`event event-${event.kind}`} key={event.id}><span>{String(event.id).padStart(3,"0")}</span><p>{event.message}</p></div>)}</div></section>
-      <BoardView
+    <EventLog
+      events={displayedEvents}
+      popupsEnabled={showEventPopups}
+      onTogglePopups={() => {
+        const next = !showEventPopups;
+        setShowEventPopups(next);
+        if (!next) {
+          setDisplayedEvents(game.events);
+          setEventQueue([]);
+          setActiveEvent(null);
+        }
+      }}
+    />
+            <BoardView
         game={game}
         current={current}
         isFullscreen={isFullscreen}
