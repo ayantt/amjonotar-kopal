@@ -20,20 +20,23 @@ Add room-code online multiplayer to Amjonotar Kopal without changing the core po
 3. At game start, randomly select one joined player as Politician; all other players become Citizens. Roles are locked when the game starts.
 4. Support 2–6 human seats. The host can start once at least two players have joined; no AI seats are added to online rooms.
 5. Players see the same board, cash, ownership, events, and current turn.
-6. Only the player whose seat owns the current turn can submit an action.
+6. Only the player whose seat owns the current turn can submit an action; the UI also disables turn actions for other seats, while the API remains the enforcement boundary.
 7. Reconnect after refresh using the seat token.
 8. Room lifecycle: waiting, active, finished, expired.
-9. Polling includes a monotonically increasing state version; action writes use optimistic concurrency so simultaneous requests cannot overwrite one another.
+9. Polling includes a monotonically increasing state version; action writes use optimistic concurrency so simultaneous requests cannot overwrite one another. A client must accept only snapshots at least as new as its current snapshot.
+11. Each consequential action carries a unique request ID. The server validates the action type and payload, rejects stale versions with the latest snapshot, and makes retries of the last committed request idempotent.
+12. Clients heartbeat seat presence, show disconnected seats after 15 seconds, stop submissions while offline, and recover by polling after reconnecting. Presence updates do not bump the game-state version.
 10. Keep single-player mode unchanged and available.
 
 ## Server API sketch
 
 - `POST /api/multiplayer/rooms` — create a room and host seat.
 - `POST /api/multiplayer/rooms/:code/join` — join an open room.
-- `GET /api/multiplayer/rooms/:code` — fetch a public room/game snapshot; authorization required for private seat details.
+- `GET /api/multiplayer/rooms/:code` — fetch the public room/game snapshot; never includes seat token hashes.
+- `POST /api/multiplayer/rooms/:code/heartbeat` — authenticated seat-presence update that does not increment the game-state version.
 - `POST /api/multiplayer/rooms/:code/start` — host starts the game when seat requirements are met.
 - `POST /api/multiplayer/rooms/:code/actions` — submit a typed game action with expected state version and seat token.
-- `POST /api/multiplayer/rooms/:code/leave` — release a seat while waiting, or mark a player disconnected during an active game.
+- `POST /api/multiplayer/rooms/:code/leave` — release a seat while waiting. Active-game seats remain reserved so a disconnected player can reconnect.
 
 ## Game-engine integration
 
@@ -62,7 +65,7 @@ The current engine creates exactly one human seat and three AI seats, and severa
 2. **Persistence/API:** schema migration, room lifecycle endpoints, token-based seat authorization, optimistic concurrency.
 3. **Client lobby:** create/join room, waiting room, seat list, copy/share room code.
 4. **Shared game:** bind existing board UI to canonical snapshots, submit actions only for the local seat, poll while active.
-5. **Hardening:** reconnect, room expiry, error states, API tests, typecheck/build, and deployment smoke test.
+5. **Multiplayer hardening (in progress):** idempotent action request IDs, action-payload validation, latest-snapshot conflict recovery, online/offline state, authenticated heartbeats and disconnected-seat indicators. Still required: automated API/concurrency tests and a deployment smoke test.
 
 ## Deployment prerequisites
 
