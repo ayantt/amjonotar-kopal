@@ -1,5 +1,5 @@
-import { BOARD } from "./board";
-import type { GameState, Player, PropertyState } from "./types";
+import { BOARD } from "./board.js";
+import type { GameState, Player, PropertyState } from "./types.js";
 export type PropertyAction = "buy" | "lease" | "decline";
 export interface LegalPropertyAction { type: PropertyAction; spaceId: string; cost: number; label: string; }
 export function isPurchasable(spaceId: string): boolean {
