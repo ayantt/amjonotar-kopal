@@ -71,9 +71,14 @@ export function MultiplayerLobby({ onBack }: { onBack: () => void }) {
     lastSeenEventId.current = latest.id;
     if (!showEventPopups) return;
     setActiveEvent(latest);
-    const timer = window.setTimeout(() => setActiveEvent((active) => active?.id === latest.id ? null : active), 2600);
-    return () => window.clearTimeout(timer);
   }, [room?.state?.events, showEventPopups]);
+
+  useEffect(() => {
+    if (!activeEvent || !showEventPopups) return;
+    const eventId = activeEvent.id;
+    const timer = window.setTimeout(() => setActiveEvent((active) => active?.id === eventId ? null : active), 2600);
+    return () => window.clearTimeout(timer);
+  }, [activeEvent, showEventPopups]);
 
   const current = room?.state?.players[room.state.currentPlayerIndex];
   const isMyTurn = Boolean(current && credentials && current.id === credentials.playerId && room?.status === "active");
