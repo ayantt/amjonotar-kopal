@@ -45,11 +45,11 @@ export function MultiplayerLobby({ onBack }: { onBack: () => void }) {
   }, [credentials]);
 
   useEffect(() => {
-    if (!credentials) return;
+    if (!credentials || working) return;
     void refresh();
     const timer = window.setInterval(() => void refresh(true), 1600);
     return () => window.clearInterval(timer);
-  }, [credentials, refresh]);
+  }, [credentials, refresh, working]);
 
   const current = room?.state?.players[room.state.currentPlayerIndex];
   const isMyTurn = Boolean(current && credentials && current.id === credentials.playerId && room?.status === "active");
