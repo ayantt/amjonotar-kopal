@@ -48,10 +48,32 @@ async function saveRoom(sql: ReturnType<typeof neon>, room: RoomRow, expectedVer
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   res.setHeader("Cache-Control", "no-store");
   res.setHeader("X-Content-Type-Options", "nosniff");
+
+  // Validate the route before touching the database. This makes unsupported
+  // methods return a useful 405 instead of failing while trying to connect.
+  const pathname = new URL(req.url ?? "/", "https://multiplayer.invalid").pathname.replace(/\/+$/, "");
+  const parts = pathname.split("/").filter(Boolean).slice(2);
+  const method = req.method ?? "GET";
+  const isRoomCollection = parts.length === 1 && parts[0] === "rooms";
+  const roomCode = (parts[1] ?? "").toUpperCase();
+  const roomAction = parts[2];
+  const isRoomRead = parts.length === 2 && /^[A-HJ-NP-Z2-9]{6}$/.test(roomCode) && method === "GET";
+  const isRoomMutation = parts.length === 3 && /^[A-HJ-NP-Z2-9]{6}$/.test(roomCode) &&
+    ["join", "start", "actions", "leave"].includes(roomAction ?? "") && method === "POST";
+
+  if (isRoomCollection && method !== "POST") {
+    res.setHeader("Allow", "POST");
+    return send(res, 405, { error: "Use POST /api/multiplayer/rooms to create a room." });
+  }
+  if (!(isRoomCollection && method === "POST") && !isRoomRead && !isRoomMutation) {
+    return send(res, 404, { error: "Unknown multiplayer endpoint or room code." });
+  }
+
   const connectionString = process.env.DATABASE_URL;
   if (!connectionString) return send(res, 503, { error: "Online multiplayer is not configured yet. DATABASE_URL is missing." });
-  const sql = neon(connectionString);
+
   try {
+    const sql = neon(connectionString);
     await sql`CREATE TABLE IF NOT EXISTS multiplayer_rooms (
       code text PRIMARY KEY,
       status text NOT NULL CHECK (status IN ('waiting', 'active', 'finished')),
@@ -62,9 +84,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       created_at timestamptz NOT NULL DEFAULT NOW(),
       expires_at timestamptz NOT NULL
     )`;
-    const pathname = new URL(req.url ?? "/", "https://multiplayer.invalid").pathname.replace(/\/+$/, "");
-    const parts = pathname.split("/").filter(Boolean).slice(2);
-    const method = req.method ?? "GET";
 
     if (parts.length === 1 && parts[0] === "rooms" && method === "POST") {
       const name = cleanName(bodyOf(req).name);
@@ -83,8 +102,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       }
     }
 
-    const code = (parts[1] ?? "").toUpperCase();
-    if (parts[0] !== "rooms" || !/^[A-HJ-NP-Z2-9]{6}$/.test(code)) return send(res, 404, { error: "Unknown multiplayer endpoint or room code." });
+    const code = roomCode;
     const room = await readRoom(sql, code);
     if (!room) return send(res, 404, { error: "Room not found or expired." });
 
