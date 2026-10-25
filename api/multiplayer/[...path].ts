@@ -3,6 +3,7 @@ import type { VercelRequest, VercelResponse } from "@vercel/node";
 import type { MultiplayerAction } from "../../src/game/engine";
 import type { GameState } from "../../src/game/types";
 
+type NeonSql = ReturnType<typeof import("@neondatabase/serverless").neon>;
 type Seat = { playerId: string; name: string; role: "politician" | "citizen"; tokenHash: string; joinedAt: string };
 type RoomRow = { code: string; status: "waiting" | "active" | "finished"; hostPlayerId: string; seats: Seat[]; state: GameState | null; version: number; createdAt: string; expiresAt: string };
 const codeAlphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
@@ -34,11 +35,11 @@ function seatFrom(req: VercelRequest, room: RoomRow): Seat | undefined {
   const hash = hashToken(token);
   return room.seats.find((seat) => seat.tokenHash === hash);
 }
-async function readRoom(sql: ReturnType<typeof neon>, code: string): Promise<RoomRow | null> {
+async function readRoom(sql: NeonSql, code: string): Promise<RoomRow | null> {
   const rows = await sql`SELECT code, status, host_player_id AS "hostPlayerId", seats, state, version, created_at AS "createdAt", expires_at AS "expiresAt" FROM multiplayer_rooms WHERE code = ${code} AND expires_at > NOW() LIMIT 1`;
   return (rows[0] as unknown as RoomRow) ?? null;
 }
-async function saveRoom(sql: ReturnType<typeof neon>, room: RoomRow, expectedVersion: number) {
+async function saveRoom(sql: NeonSql, room: RoomRow, expectedVersion: number) {
   const rows = await sql`UPDATE multiplayer_rooms SET status = ${room.status}, seats = ${JSON.stringify(room.seats)}::jsonb, state = ${room.state ? JSON.stringify(room.state) : null}::jsonb, version = version + 1 WHERE code = ${room.code} AND version = ${expectedVersion} AND expires_at > NOW() RETURNING version`;
   return rows.length > 0;
 }
