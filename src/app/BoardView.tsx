@@ -37,6 +37,7 @@ export function BoardView({
     <div className="board-grid">
       {BOARD.map((space, index) => {
         const occupants = game.players.filter((player) => player.position === index);
+        const playerColorClass = (playerId: string) => localPlayerId ? `player-color-player-${game.players.findIndex((player) => player.id === playerId) + 1}` : `player-color-${playerId}`;
         const edge = index <= 10
           ? { gridColumn: 11 - index, gridRow: 11 }
           : index <= 19
@@ -49,7 +50,7 @@ export function BoardView({
           {space.price !== undefined && <span className="space-price">{money(space.price)}</span>}
           {game.cooperativePropertyIds.includes(space.id) && <small className="ownership-tag">OWN: CITIZENS CO-OP</small>}{game.properties[space.id]?.ownerId && <small className="ownership-tag">OWN: {game.players.find((player) => player.id === game.properties[space.id].ownerId)?.name ?? "Unknown"}</small>}{game.properties[space.id]?.mortgaged && <small className="ownership-tag">MORTGAGED</small>}{(game.properties[space.id]?.houses ?? 0) > 0 && <small className="ownership-tag">HOUSES: {game.properties[space.id].houses}</small>}{game.properties[space.id]?.hotel && <small className="ownership-tag">HOTEL · 6× RENT</small>}
           {game.properties[space.id]?.leaseholderId && <small className="ownership-tag">LEASE: {game.players.find((player) => player.id === game.properties[space.id].leaseholderId)?.role === "politician" ? "Leader" : game.players.find((player) => player.id === game.properties[space.id].leaseholderId)?.name ?? "Unknown"}</small>}
-          {occupants.length > 0 && <div className="tokens">{occupants.map((player) => <span title={`${player.name} · ${roleName(player.role)}`} key={player.id} className={`token ${player.role} ${player.controller} player-color-${player.id}`}>{localPlayerId ? (player.id === localPlayerId ? "YOU" : player.role === "politician" ? "P" : player.name.slice(0,1)) : player.controller === "human" ? "YOU" : player.role === "politician" ? "P" : player.name.slice(0,1)}</span>)}</div>}
+          {occupants.length > 0 && <div className="tokens">{occupants.map((player) => <span title={`${player.name} · ${roleName(player.role)}`} key={player.id} className={`token ${player.role} ${player.controller} ${playerColorClass(player.id)}`}>{localPlayerId ? (player.id === localPlayerId ? "YOU" : player.role === "politician" ? "P" : player.name.slice(0,1)) : player.controller === "human" ? "YOU" : player.role === "politician" ? "P" : player.name.slice(0,1)}</span>)}</div>}
         </div>;
       })}
       <div className="board-center">
