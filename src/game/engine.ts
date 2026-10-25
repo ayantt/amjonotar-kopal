@@ -18,8 +18,11 @@ function checkVictory(state: GameState, atCitizenRoundStart = false): GameState 
   const citizens = activeCitizens(state);
   const controls = Object.values(state.properties).filter((p) => p.ownerId === politician.id || p.leaseholderId === politician.id).length;
   const assetValue = Object.values(state.properties).filter((p) => p.ownerId === politician.id).reduce((sum, p) => sum + (BOARD.find((s) => s.id === p.spaceId)?.price ?? 0), 0);
-  if (state.players.filter((p) => p.role === "citizen" && p.bankrupt).length >= 2) {
-    return addEvent({ ...state, phase: "game-over", winner: "politician", pendingPropertyId: null }, "The Politician wins: two Citizens are bankrupt.");
+  const totalCitizens = state.players.filter((p) => p.role === "citizen").length;
+  const bankruptCitizens = state.players.filter((p) => p.role === "citizen" && p.bankrupt).length;
+  const bankruptThreshold = Math.ceil(totalCitizens / 2);
+  if (bankruptCitizens >= bankruptThreshold) {
+    return addEvent({ ...state, phase: "game-over", winner: "politician", pendingPropertyId: null }, `The Politician wins: ${bankruptCitizens} Citizen(s) are bankrupt.`);
   }
   if (controls >= 7 || politician.cash + assetValue >= 8_000) {
     return addEvent({ ...state, phase: "game-over", winner: "politician", pendingPropertyId: null }, controls >= 7 ? "The Politician wins by controlling at least seven properties." : "The Politician wins by reaching ৳8,000 in cash and owned property value.");
@@ -27,7 +30,9 @@ function checkVictory(state: GameState, atCitizenRoundStart = false): GameState 
   if (atCitizenRoundStart && state.charterPendingRound !== null && state.round > state.charterPendingRound) {
     const controlled = Object.values(state.properties).filter((p) => (p.ownerId !== null && citizens.some((citizen) => citizen.id === p.ownerId)) || state.cooperativePropertyIds.includes(p.spaceId)).length;
     const combinedCash = citizens.reduce((sum, citizen) => sum + citizen.cash, 0);
-    if (citizens.length === 3 && controlled >= 8 && combinedCash >= 3_000 && state.cooperativeFund >= 1_000 && state.charterVotes.length >= 2) {
+    const totalCitizens = state.players.filter((p) => p.role === "citizen").length;
+    const requiredVotes = Math.floor(totalCitizens / 2) + 1;
+    if (citizens.length === totalCitizens && controlled >= 8 && combinedCash >= 3_000 && state.cooperativeFund >= 1_000 && state.charterVotes.length >= requiredVotes) {
       return addEvent({ ...state, phase: "game-over", winner: "citizens", charterActivated: true, pendingPropertyId: null }, "The People's Charter held through the next Citizen round. All Citizens win together.");
     }
     return addEvent({ ...state, charterPendingRound: null, charterVotes: [] }, "The People's Charter conditions did not hold until the next Citizen round; Citizens may organize again.");
@@ -85,14 +90,17 @@ export function createNewGame({ humanRole }: NewGameOptions): GameState {
   return initializeGame(players, `Game started. You play as ${humanRole === "politician" ? "Politician" : "Citizen"}; three opponents are computer-controlled.`);
 }
 /** Creates a shared game in which each seat is controlled by a connected human client. */
-export function createMultiplayerGame(playerNames: [string, string, string, string]): GameState {
-  const roles: PlayerRole[] = ["politician", "citizen", "citizen", "citizen"];
-  const players = roles.map((role, index) => {
-    const name = playerNames[index].trim().slice(0, 24);
+export function createMultiplayerGame(playerNames: string[], random: () => number = defaultRandom): GameState {
+  if (playerNames.length < 2 || playerNames.length > 6) throw new Error("Online multiplayer requires between two and six players.");
+  const sample = random();
+  if (!(sample >= 0 && sample < 1)) throw new Error("Random source must return a value in [0, 1).");
+  const politicianIndex = Math.floor(sample * playerNames.length);
+  const players = playerNames.map((rawName, index) => {
+    const name = rawName.trim().slice(0, 24);
     if (!name) throw new Error("Every multiplayer seat needs a display name.");
-    return makePlayer(`player-${index + 1}`, name, role, "human");
+    return makePlayer(`player-${index + 1}`, name, index === politicianIndex ? "politician" : "citizen", "human");
   });
-  return initializeGame(players, "Online multiplayer game started. One Politician and three Citizens are playing together.");
+  return initializeGame(players, `Online multiplayer game started with ${players.length} players. ${players[politicianIndex].name} was randomly selected as Politician; everyone else is a Citizen.`);
 }
 export function rollDice(count: number, random: () => number = defaultRandom): number[] {
   if (!Number.isInteger(count) || count < 1) throw new Error("Dice count must be a positive integer.");

@@ -5,6 +5,23 @@ import { runAiTurn } from "../../src/game/turns";
 import { getLegalPropertyActions } from "../../src/game/properties";
 
 describe("game setup", () => {
+  it("supports two to six human multiplayer seats and randomly assigns exactly one Politician", () => {
+    const twoPlayers = createMultiplayerGame(["Host", "Guest"], () => 0.99);
+    expect(twoPlayers.players).toHaveLength(2);
+    expect(twoPlayers.players.filter((player) => player.role === "politician").map((player) => player.name)).toEqual(["Guest"]);
+    expect(twoPlayers.players.every((player) => player.controller === "human")).toBe(true);
+
+    const sixPlayers = createMultiplayerGame(["A", "B", "C", "D", "E", "F"], () => 0);
+    expect(sixPlayers.players).toHaveLength(6);
+    expect(sixPlayers.players.filter((player) => player.role === "politician").map((player) => player.name)).toEqual(["A"]);
+    expect(sixPlayers.players.filter((player) => player.role === "citizen")).toHaveLength(5);
+  });
+
+  it("rejects multiplayer games outside the two-to-six player range", () => {
+    expect(() => createMultiplayerGame(["Solo"])).toThrow(/between two and six/);
+    expect(() => createMultiplayerGame(["A", "B", "C", "D", "E", "F", "G"])).toThrow(/between two and six/);
+  });
+
   it("always creates one Politician, three Citizens, one human and three AI seats", () => {
     for (const humanRole of ["politician", "citizen"] as const) {
       const state = createNewGame({ humanRole });
