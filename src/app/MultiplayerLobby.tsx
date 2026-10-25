@@ -186,7 +186,7 @@ export function MultiplayerLobby({ onBack }: { onBack: () => void }) {
         <section className="game-intro"><div><p className="eyebrow">THE PEOPLE PAY. THE POWERFUL PLAY.</p><h1>The board is <em>rigged.</em></h1></div><p>{working ? "Synchronizing with the room…" : isMyTurn ? "Your seat is active. Actions are validated by the game server." : `Waiting for ${current.name} to complete their turn.`}</p></section>
         <section className="game-layout">
           <EventLog events={room.state.events} popupsEnabled={showEventPopups} onTogglePopups={() => { setShowEventPopups((enabled) => !enabled); setActiveEvent(null); }} />
-          <BoardView game={room.state} current={current} isFullscreen={isFullscreen} showEventPopup={showEventPopups} activeEvent={activeEvent} onSelectProperty={setSelectedPropertyId} onToggleFullscreen={async () => {
+          <BoardView game={room.state} current={current} localPlayerId={credentials.playerId} isFullscreen={isFullscreen} showEventPopup={showEventPopups} activeEvent={activeEvent} onSelectProperty={setSelectedPropertyId} onToggleFullscreen={async () => {
             try {
               if (document.fullscreenElement) await document.exitFullscreen();
               else await document.querySelector(".multiplayer-board-shell")?.requestFullscreen?.();
