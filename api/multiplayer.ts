@@ -155,11 +155,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     if (parts[2] === "actions" && method === "POST") {
-      if (room.status !== "active" || !room.state) return send(res, 409, { error: "This room is not in an active game.", room: publicRoom(room) });
       const body = bodyOf(req);
       const requestId = typeof body.requestId === "string" ? body.requestId : "";
+      // A retry of the last committed action remains acknowledged even if it
+      // ended the game and the room has since moved to the finished state.
+      if (/^[a-f0-9-]{36}$/i.test(requestId) && room.lastActionId === requestId) {
+        return send(res, 200, { room: publicRoom(room), duplicate: true });
+      }
+      if (room.status !== "active" || !room.state) return send(res, 409, { error: "This room is not in an active game.", room: publicRoom(room) });
       if (!/^[a-f0-9-]{36}$/i.test(requestId)) return send(res, 400, { error: "A valid requestId is required for every action." });
-      if (room.lastActionId === requestId) return send(res, 200, { room: publicRoom(room), duplicate: true });
       const expectedVersion = Number(body.version);
       if (!Number.isInteger(expectedVersion) || expectedVersion !== room.version) return send(res, 409, { error: "State is out of date. The latest room state is included.", room: publicRoom(room) });
       if (room.state.players[room.state.currentPlayerIndex]?.id !== seat.playerId) return send(res, 403, { error: "It is not your turn." });
