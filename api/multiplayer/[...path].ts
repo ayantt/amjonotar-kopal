@@ -1,7 +1,5 @@
 import { randomBytes, createHash } from "node:crypto";
 import type { VercelRequest, VercelResponse } from "@vercel/node";
-import { neon } from "@neondatabase/serverless";
-import { applyMultiplayerAction, createMultiplayerGame } from "../../src/game/engine";
 import type { MultiplayerAction } from "../../src/game/engine";
 import type { GameState } from "../../src/game/types";
 
@@ -73,7 +71,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (!connectionString) return send(res, 503, { error: "Online multiplayer is not configured yet. DATABASE_URL is missing." });
 
   try {
-    const sql = neon(connectionString);
+    // Load runtime dependencies inside the guarded handler so module-loading\n    // failures become diagnosable API responses instead of opaque invocation failures.\n    const { neon } = await import("@neondatabase/serverless");\n    const sql = neon(connectionString);
     await sql`CREATE TABLE IF NOT EXISTS multiplayer_rooms (
       code text PRIMARY KEY,
       status text NOT NULL CHECK (status IN ('waiting', 'active', 'finished')),
@@ -131,6 +129,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       const expectedVersion = Number(bodyOf(req).version);
       if (!Number.isInteger(expectedVersion) || expectedVersion !== room.version) return send(res, 409, { error: "The room changed. Refresh and try again." });
       const names = room.seats.map((item) => item.name) as [string, string, string, string];
+      const { createMultiplayerGame } = await import("../../src/game/engine");
       const state = createMultiplayerGame(names);
       const next = { ...room, status: "active" as const, state, version: room.version + 1 };
       if (!await saveRoom(sql, next, expectedVersion)) return send(res, 409, { error: "The room changed. Refresh and try again." });
@@ -146,7 +145,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       if (!body.action || typeof body.action !== "object" || Array.isArray(body.action)) return send(res, 400, { error: "A valid game action is required." });
       let state: GameState;
       try {
-        state = applyMultiplayerAction(room.state, seat.playerId, body.action as MultiplayerAction);
+        const { applyMultiplayerAction } = await import("../../src/game/engine");\n        state = applyMultiplayerAction(room.state, seat.playerId, body.action as MultiplayerAction);
       } catch (error) {
         return send(res, 422, { error: error instanceof Error ? error.message : "That action is not legal." });
       }
@@ -174,7 +173,23 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
     return send(res, 404, { error: "Unknown multiplayer endpoint." });
   } catch (error) {
+    // Log the full exception server-side, but return only a safe diagnostic
+    // category to clients (never connection strings or credentials).
     console.error("Multiplayer API error", error);
-    return send(res, 500, { error: "The multiplayer service encountered an unexpected error." });
+    const message = error instanceof Error ? error.message : String(error);
+    const code = /DATABASE_URL|connection string|connection refused|ENOTFOUND|ECONN|timeout|fetch failed|authentication/i.test(message)
+      ? "DATABASE_CONNECTION_FAILED"
+      : /Cannot find package|Cannot find module|ERR_MODULE_NOT_FOUND|module/i.test(message)
+        ? "RUNTIME_DEPENDENCY_LOAD_FAILED"
+        : "MULTIPLAYER_INTERNAL_ERROR";
+    return send(res, 500, {
+      error: "The multiplayer service could not complete the request.",
+      code,
+      hint: code === "DATABASE_CONNECTION_FAILED"
+        ? "Check DATABASE_URL in Vercel Preview environment variables and verify the Neon database credentials."
+        : code === "RUNTIME_DEPENDENCY_LOAD_FAILED"
+          ? "A server dependency could not be loaded by the Vercel function."
+          : "Check the Vercel runtime logs for the full server-side exception."
+    });
   }
 }
