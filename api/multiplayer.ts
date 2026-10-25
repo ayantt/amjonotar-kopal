@@ -1,10 +1,9 @@
 import { randomBytes, createHash } from "node:crypto";
-import { neon } from "@neondatabase/serverless";
 import type { VercelRequest, VercelResponse } from "@vercel/node";
-import { applyMultiplayerAction, createMultiplayerGame, type MultiplayerAction } from "../src/game/engine";
+import type { MultiplayerAction } from "../src/game/engine";
 import type { GameState } from "../src/game/types";
 
-type NeonSql = ReturnType<typeof neon>;
+type NeonSql = ReturnType<typeof import("@neondatabase/serverless").neon>;
 type Seat = { playerId: string; name: string; role: "politician" | "citizen" | null; tokenHash: string; joinedAt: string };
 type RoomRow = { code: string; status: "waiting" | "active" | "finished"; hostPlayerId: string; seats: Seat[]; state: GameState | null; version: number; createdAt: string; expiresAt: string };
 const codeAlphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
@@ -74,6 +73,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (!connectionString) return send(res, 503, { error: "Online multiplayer is not configured yet. DATABASE_URL is missing." });
 
   try {
+    const { neon } = await import("@neondatabase/serverless");
     const sql = neon(connectionString);
     await sql`CREATE TABLE IF NOT EXISTS multiplayer_rooms (
       code text PRIMARY KEY,
@@ -132,6 +132,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       const expectedVersion = Number(bodyOf(req).version);
       if (!Number.isInteger(expectedVersion) || expectedVersion !== room.version) return send(res, 409, { error: "The room changed. Refresh and try again." });
       const names = room.seats.map((item) => item.name);
+      const { createMultiplayerGame } = await import("../src/game/engine");
       const generatedState = createMultiplayerGame(names);
       // Keep the stable room-seat IDs in the canonical game state so each
       // browser's seat token remains bound to the same player after start.
@@ -154,6 +155,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       if (!body.action || typeof body.action !== "object" || Array.isArray(body.action)) return send(res, 400, { error: "A valid game action is required." });
       let state: GameState;
       try {
+        const { applyMultiplayerAction } = await import("../src/game/engine");
         state = applyMultiplayerAction(room.state, seat.playerId, body.action as MultiplayerAction);
       } catch (error) {
         return send(res, 422, { error: error instanceof Error ? error.message : "That action is not legal." });
