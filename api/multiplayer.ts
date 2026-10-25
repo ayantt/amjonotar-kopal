@@ -1,10 +1,9 @@
 import { randomBytes, createHash } from "node:crypto";
-import { neon } from "@neondatabase/serverless";
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 import { applyMultiplayerAction, createMultiplayerGame, type MultiplayerAction } from "../src/game/engine";
 import type { GameState } from "../src/game/types";
 
-type NeonSql = ReturnType<typeof neon>;
+type NeonSql = ReturnType<typeof import("@neondatabase/serverless").neon>;
 type Seat = { playerId: string; name: string; role: "politician" | "citizen" | null; tokenHash: string; joinedAt: string };
 type RoomRow = { code: string; status: "waiting" | "active" | "finished"; hostPlayerId: string; seats: Seat[]; state: GameState | null; version: number; createdAt: string; expiresAt: string };
 const codeAlphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
@@ -74,6 +73,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (!connectionString) return send(res, 503, { error: "Online multiplayer is not configured yet. DATABASE_URL is missing." });
 
   try {
+    const { neon } = await import("@neondatabase/serverless");
     const sql = neon(connectionString);
     await sql`CREATE TABLE IF NOT EXISTS multiplayer_rooms (
       code text PRIMARY KEY,
