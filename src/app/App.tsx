@@ -3,6 +3,7 @@ import { BOARD } from "../game/board";
 import { buildProperty, buyCooperativeProperty, contributeToCooperative, createNewGame, endTurn, getBuildingCost, getCurrentPlayer, getMortgageTerms, isHumanTurn, mortgageProperty, redeemMortgage, resolvePropertyAction, rollAndMove, sellProperty, validateSetup, voteForCharter } from "../game/engine";
 import { runAiTurn } from "../game/turns";
 import { getBaseRent, getLegalPropertyActions } from "../game/properties";
+import { MultiplayerLobby } from "./MultiplayerLobby";
 import type { GameState, PlayerRole } from "../game/types";
 
 
@@ -48,6 +49,7 @@ const money = (amount: number) => `৳${amount.toLocaleString("en-BD")}`;
 const roleName = (role: PlayerRole) => role === "politician" ? "Politician" : "Citizen";
 export function App() {
   const [game, setGame] = useState<GameState | null>(null);
+  const [showMultiplayer, setShowMultiplayer] = useState(false);
   const [busy, setBusy] = useState(false);
   const [soundEnabled, setSoundEnabled] = useState(true);
   const victorySoundPlayed = useRef(false);
@@ -203,6 +205,8 @@ export function App() {
     setLastAction("Choose your role to start a new game.");
   }
 
+  if (!game && showMultiplayer) return <MultiplayerLobby onBack={() => setShowMultiplayer(false)} />;
+
   if (!game) return <main className="app-shell">
     <header className="masthead"><span className="seal">আ</span><span>PiStack POLITICS CLUB</span><span className="masthead-right">BOARD GAME NO. 01</span></header>
     <section className="hero">
@@ -214,8 +218,9 @@ export function App() {
         <button className="role-card politician-card" onClick={() => startGame("politician")}><span className="role-number">01 / POWER</span><strong>Play as Politician</strong><span>Two dice. Special privileges. Keep the system on your side.</span><span className="button-copy">TAKE THE CHAIR ↗</span></button>
         <button className="role-card citizen-card" onClick={() => startGame("citizen")}><span className="role-number">02 / PEOPLE</span><strong>Play as Citizen</strong><span>One die. Three citizens. Your best chance is to work together.</span><span className="button-copy">JOIN THE PUBLIC ↗</span></button>
       </div>
+      <button className="multiplayer-entry" onClick={() => setShowMultiplayer(true)}><span><strong>PLAY WITH FRIENDS</strong><small>Online multiplayer · room code · four human players</small></span><b>CREATE / JOIN ROOM ↗</b></button>
     </section>
-    <footer className="site-footer"><span>FICTIONAL POLITICAL SATIRE</span><span>4 SEATS · 1 HUMAN · 3 AI</span></footer>
+    <footer className="site-footer"><span>FICTIONAL POLITICAL SATIRE</span><span>4 SEATS · SINGLE-PLAYER OR ONLINE</span></footer>
   </main>;
 
   const current = getCurrentPlayer(game);
