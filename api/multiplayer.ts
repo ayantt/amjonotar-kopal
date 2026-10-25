@@ -4,7 +4,7 @@ import { applyMultiplayerAction, createMultiplayerGame, type MultiplayerAction }
 import type { GameState } from "../src/game/types.js";
 
 type NeonSql = ReturnType<typeof import("@neondatabase/serverless").neon>;
-type Seat = { playerId: string; name: string; role: "politician" | "citizen" | null; tokenHash: string; joinedAt: string };
+type Seat = { playerId: string; name: string; role: "politician" | "citizen" | null; tokenHash: string; joinedAt: string; lastSeenAt?: string };
 type RoomRow = { code: string; status: "waiting" | "active" | "finished"; hostPlayerId: string; seats: Seat[]; state: GameState | null; version: number; lastActionId?: string | null; createdAt: string; expiresAt: string };
 const codeAlphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
 const hashToken = (token: string) => createHash("sha256").update(token).digest("hex");
@@ -16,7 +16,7 @@ const publicRoom = (room: RoomRow) => ({
   status: room.status,
   version: room.version,
   hostPlayerId: room.hostPlayerId,
-  seats: room.seats.map(({ playerId, name, role, joinedAt }) => ({ playerId, name, role, joinedAt })),
+  seats: room.seats.map(({ playerId, name, role, joinedAt, lastSeenAt }) => ({ playerId, name, role, joinedAt, lastSeenAt })),
   state: room.state,
   createdAt: room.createdAt,
   expiresAt: room.expiresAt,
@@ -59,7 +59,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const roomAction = parts[2];
   const isRoomRead = parts.length === 2 && /^[A-HJ-NP-Z2-9]{6}$/.test(roomCode) && method === "GET";
   const isRoomMutation = parts.length === 3 && /^[A-HJ-NP-Z2-9]{6}$/.test(roomCode) &&
-    ["join", "start", "actions", "leave"].includes(roomAction ?? "") && method === "POST";
+    ["join", "start", "actions", "leave", "heartbeat"].includes(roomAction ?? "") && method === "POST";
 
   if (isRoomCollection && method !== "POST") {
     res.setHeader("Allow", "POST");
@@ -127,6 +127,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     const seat = seatFrom(req, room);
     if (!seat) return send(res, 401, { error: "A valid seat token is required." });
+
+    if (parts[2] === "heartbeat" && method === "POST") {
+      // Presence is deliberately separate from the game version: heartbeat
+      // traffic must not create false stale-state conflicts for game actions.
+      await sql`UPDATE multiplayer_rooms SET seats = (SELECT jsonb_agg(CASE WHEN seat->>'playerId' = ${seat.playerId} THEN seat || jsonb_build_object('lastSeenAt', NOW()::text) ELSE seat END) FROM jsonb_array_elements(seats) AS seat) WHERE code = ${code} AND expires_at > NOW()`;
+      return send(res, 204, {});
+    }
 
     if (parts[2] === "start" && method === "POST") {
       if (seat.playerId !== room.hostPlayerId) return send(res, 403, { error: "Only the host can start the game." });
