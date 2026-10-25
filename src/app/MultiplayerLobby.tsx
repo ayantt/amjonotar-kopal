@@ -99,7 +99,18 @@ export function MultiplayerLobby({ onBack }: { onBack: () => void }) {
     await perform(`/api/multiplayer/rooms/${room.code}/actions`, { version: room.version, action });
   }
 
-  function disconnect() {
+  async function disconnect() {
+    if (credentials && room?.status === "waiting") {
+      try {
+        await request(`/api/multiplayer/rooms/${encodeURIComponent(credentials.code)}/leave`, {
+          method: "POST",
+          headers: { Authorization: `Bearer ${credentials.token}` },
+          body: JSON.stringify({ version: room.version }),
+        });
+      } catch {
+        // Leaving this device should remain possible even if the room has already changed.
+      }
+    }
     saveCredentials(null); setRoom(null); setError(""); setNotice("Create a room or join friends with a room code.");
   }
 
