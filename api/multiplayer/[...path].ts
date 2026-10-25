@@ -143,11 +143,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (parts[2] === "leave" && method === "POST") {
       if (room.status !== "waiting") return send(res, 409, { error: "Seats cannot be removed after the game starts." });
       const expectedVersion = Number(bodyOf(req).version ?? room.version);
+      if (!Number.isInteger(expectedVersion) || expectedVersion !== room.version) return send(res, 409, { error: "The room changed. Refresh and try again." });
+      if (seat.playerId === room.hostPlayerId) {
+        const rows = await sql`UPDATE multiplayer_rooms SET expires_at = NOW(), version = version + 1 WHERE code = ${code} AND version = ${expectedVersion} RETURNING code`;
+        if (!rows.length) return send(res, 409, { error: "The room changed. Refresh and try again." });
+        return send(res, 200, { left: true, roomClosed: true });
+      }
       const seats = room.seats.filter((item) => item.playerId !== seat.playerId);
-      if (seat.playerId === room.hostPlayerId && seats.length > 0) return send(res, 409, { error: "The host must close the room or transfer hosting before leaving." });
-      const rows = await sql`DELETE FROM multiplayer_rooms WHERE code = ${code} AND version = ${expectedVersion} RETURNING code`;
-      if (!rows.length) return send(res, 409, { error: "The room changed. Refresh and try again." });
-      return send(res, 200, { left: true });
+      const next = { ...room, seats, version: room.version + 1 };
+      if (!await saveRoom(sql, next, expectedVersion)) return send(res, 409, { error: "The room changed. Refresh and try again." });
+      return send(res, 200, { left: true, room: publicRoom(next) });
     }
     return send(res, 404, { error: "Unknown multiplayer endpoint." });
   } catch (error) {
