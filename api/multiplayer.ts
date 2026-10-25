@@ -4,7 +4,7 @@ import type { MultiplayerAction } from "../src/game/engine";
 import type { GameState } from "../src/game/types";
 
 type NeonSql = ReturnType<typeof import("@neondatabase/serverless").neon>;
-type Seat = { playerId: string; name: string; role: "politician" | "citizen"; tokenHash: string; joinedAt: string };
+type Seat = { playerId: string; name: string; role: "politician" | "citizen" | null; tokenHash: string; joinedAt: string };
 type RoomRow = { code: string; status: "waiting" | "active" | "finished"; hostPlayerId: string; seats: Seat[]; state: GameState | null; version: number; createdAt: string; expiresAt: string };
 const codeAlphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
 const hashToken = (token: string) => createHash("sha256").update(token).digest("hex");
@@ -92,8 +92,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       const name = cleanName(bodyOf(req).name);
       if (!name) return send(res, 400, { error: "Enter a display name (up to 24 characters)." });
       const token = newToken();
-      const playerId = "player-1";
-      const seat: Seat = { playerId, name, role: "politician", tokenHash: hashToken(token), joinedAt: new Date().toISOString() };
+      const playerId = `seat-${randomBytes(8).toString("hex")}`;
+      const seat: Seat = { playerId, name, role: null, tokenHash: hashToken(token), joinedAt: new Date().toISOString() };
       for (let attempt = 0; attempt < 4; attempt++) {
         const code = newCode();
         try {
@@ -115,11 +115,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       if (room.status !== "waiting") return send(res, 409, { error: "This room has already started." });
       const name = cleanName(bodyOf(req).name);
       if (!name) return send(res, 400, { error: "Enter a display name (up to 24 characters)." });
-      if (room.seats.length >= 4) return send(res, 409, { error: "This room is full." });
+      if (room.seats.length >= 6) return send(res, 409, { error: "This room is full. Maximum six players." });
       const expectedVersion = Number(bodyOf(req).version ?? room.version);
-      const playerId = `player-${room.seats.length + 1}`;
+      const playerId = `seat-${randomBytes(8).toString("hex")}`;
       const token = newToken();
-      const seat: Seat = { playerId, name, role: "citizen", tokenHash: hashToken(token), joinedAt: new Date().toISOString() };
+      const seat: Seat = { playerId, name, role: null, tokenHash: hashToken(token), joinedAt: new Date().toISOString() };
       const next = { ...room, seats: [...room.seats, seat], version: room.version + 1 };
       if (!await saveRoom(sql, next, expectedVersion)) return send(res, 409, { error: "The room changed. Refresh and try again." });
       return send(res, 201, { room: { ...publicRoom(next), version: expectedVersion + 1 }, playerId, token });
@@ -130,13 +130,20 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     if (parts[2] === "start" && method === "POST") {
       if (seat.playerId !== room.hostPlayerId) return send(res, 403, { error: "Only the host can start the game." });
-      if (room.status !== "waiting" || room.seats.length !== 4) return send(res, 409, { error: "Four players must join before the host can start." });
+      if (room.status !== "waiting" || room.seats.length < 2 || room.seats.length > 6) return send(res, 409, { error: "At least two players must join before the host can start." });
       const expectedVersion = Number(bodyOf(req).version);
       if (!Number.isInteger(expectedVersion) || expectedVersion !== room.version) return send(res, 409, { error: "The room changed. Refresh and try again." });
-      const names = room.seats.map((item) => item.name) as [string, string, string, string];
+      const names = room.seats.map((item) => item.name);
       const { createMultiplayerGame } = await import("../src/game/engine");
-      const state = createMultiplayerGame(names);
-      const next = { ...room, status: "active" as const, state, version: room.version + 1 };
+      const generatedState = createMultiplayerGame(names);
+      // Keep the stable room-seat IDs in the canonical game state so each
+      // browser's seat token remains bound to the same player after start.
+      const state: GameState = {
+        ...generatedState,
+        players: generatedState.players.map((player, index) => ({ ...player, id: room.seats[index].playerId })),
+      };
+      const seats = room.seats.map((item, index) => ({ ...item, role: generatedState.players[index].role }));
+      const next = { ...room, seats, status: "active" as const, state, version: room.version + 1 };
       if (!await saveRoom(sql, next, expectedVersion)) return send(res, 409, { error: "The room changed. Refresh and try again." });
       return send(res, 200, { room: { ...publicRoom(next), version: expectedVersion + 1 } });
     }
