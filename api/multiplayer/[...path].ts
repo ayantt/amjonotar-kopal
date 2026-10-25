@@ -71,7 +71,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (!connectionString) return send(res, 503, { error: "Online multiplayer is not configured yet. DATABASE_URL is missing." });
 
   try {
-    // Load runtime dependencies inside the guarded handler so module-loading\n    // failures become diagnosable API responses instead of opaque invocation failures.\n    const { neon } = await import("@neondatabase/serverless");\n    const sql = neon(connectionString);
+    // Load runtime dependencies inside the guarded handler so module-loading
+    // failures become diagnosable API responses instead of opaque invocation failures.
+    const { neon } = await import("@neondatabase/serverless");
+    const sql = neon(connectionString);
     await sql`CREATE TABLE IF NOT EXISTS multiplayer_rooms (
       code text PRIMARY KEY,
       status text NOT NULL CHECK (status IN ('waiting', 'active', 'finished')),
@@ -145,7 +148,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       if (!body.action || typeof body.action !== "object" || Array.isArray(body.action)) return send(res, 400, { error: "A valid game action is required." });
       let state: GameState;
       try {
-        const { applyMultiplayerAction } = await import("../../src/game/engine");\n        state = applyMultiplayerAction(room.state, seat.playerId, body.action as MultiplayerAction);
+        const { applyMultiplayerAction } = await import("../../src/game/engine");
+        state = applyMultiplayerAction(room.state, seat.playerId, body.action as MultiplayerAction);
       } catch (error) {
         return send(res, 422, { error: error instanceof Error ? error.message : "That action is not legal." });
       }
