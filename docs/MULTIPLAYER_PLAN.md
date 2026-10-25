@@ -17,8 +17,8 @@ Add room-code online multiplayer to Amjonotar Kopal without changing the core po
 
 1. Create a room and receive a short, human-readable room code.
 2. Join an open room by code and display name.
-3. Host selects the Politician seat; remaining seats are Citizens. Seats are locked when the game starts.
-4. Four seats maximum. Host can start when the required seats are filled; any unfilled seats may optionally be AI-controlled in a later iteration.
+3. At game start, randomly select one joined player as Politician; all other players become Citizens. Roles are locked when the game starts.
+4. Support 2–6 human seats. The host can start once at least two players have joined; no AI seats are added to online rooms.
 5. Players see the same board, cash, ownership, events, and current turn.
 6. Only the player whose seat owns the current turn can submit an action.
 7. Reconnect after refresh using the seat token.
