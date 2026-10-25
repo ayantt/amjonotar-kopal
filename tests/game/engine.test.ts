@@ -50,7 +50,7 @@ describe("multiplayer engine entry points", () => {
   });
 
   it("routes valid commands through the existing rules engine", () => {
-    const state = createMultiplayerGame(["Host", "Amina", "Rafi", "Nila"]);
+    const state = createMultiplayerGame(["Host", "Amina", "Rafi", "Nila"], () => 0);
     const next = applyMultiplayerAction(state, "player-1", { type: "roll" }, () => 0);
     expect(next.players[0].lastRoll).toEqual([1, 1]);
     expect(next.events.some((event) => event.message.includes("rolled 1 + 1 = 2"))).toBe(true);

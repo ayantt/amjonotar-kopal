@@ -20,20 +20,23 @@ Add room-code online multiplayer to Amjonotar Kopal without changing the core po
 3. At game start, randomly select one joined player as Politician; all other players become Citizens. Roles are locked when the game starts.
 4. Support 2–6 human seats. The host can start once at least two players have joined; no AI seats are added to online rooms.
 5. Players see the same board, cash, ownership, events, and current turn.
-6. Only the player whose seat owns the current turn can submit an action.
+6. Only the player whose seat owns the current turn can submit an action; the UI also disables turn actions for other seats, while the API remains the enforcement boundary.
 7. Reconnect after refresh using the seat token.
 8. Room lifecycle: waiting, active, finished, expired.
-9. Polling includes a monotonically increasing state version; action writes use optimistic concurrency so simultaneous requests cannot overwrite one another.
+9. Polling includes a monotonically increasing state version; action writes use optimistic concurrency so simultaneous requests cannot overwrite one another. A client must accept only snapshots at least as new as its current snapshot.
+11. Each consequential action carries a unique request ID. The server validates the action type and payload, rejects stale versions with the latest snapshot, and makes retries of the last committed request idempotent.
+12. Clients heartbeat seat presence, show disconnected seats after 15 seconds, stop submissions while offline, and recover by polling after reconnecting. Presence updates do not bump the game-state version.
 10. Keep single-player mode unchanged and available.
 
 ## Server API sketch
 
 - `POST /api/multiplayer/rooms` — create a room and host seat.
 - `POST /api/multiplayer/rooms/:code/join` — join an open room.
-- `GET /api/multiplayer/rooms/:code` — fetch a public room/game snapshot; authorization required for private seat details.
+- `GET /api/multiplayer/rooms/:code` — fetch the public room/game snapshot; never includes seat token hashes.
+- `POST /api/multiplayer/rooms/:code/heartbeat` — authenticated seat-presence update that does not increment the game-state version.
 - `POST /api/multiplayer/rooms/:code/start` — host starts the game when seat requirements are met.
 - `POST /api/multiplayer/rooms/:code/actions` — submit a typed game action with expected state version and seat token.
-- `POST /api/multiplayer/rooms/:code/leave` — release a seat while waiting, or mark a player disconnected during an active game.
+- `POST /api/multiplayer/rooms/:code/leave` — release a seat while waiting. Active-game seats remain reserved so a disconnected player can reconnect.
 
 ## Game-engine integration
 
@@ -62,8 +65,8 @@ The current engine creates exactly one human seat and three AI seats, and severa
 2. **Persistence/API:** schema migration, room lifecycle endpoints, token-based seat authorization, optimistic concurrency.
 3. **Client lobby:** create/join room, waiting room, seat list, copy/share room code.
 4. **Shared game:** bind existing board UI to canonical snapshots, submit actions only for the local seat, poll while active.
-5. **Hardening:** reconnect, room expiry, error states, API tests, typecheck/build, and deployment smoke test.
+5. **Multiplayer hardening (implemented; verification pending):** idempotent action request IDs, action-payload validation, latest-snapshot conflict recovery, online/offline state, authenticated heartbeats and disconnected-seat indicators. `tests/api/multiplayer.test.ts` covers authentication, out-of-turn requests, malformed actions, stale versions, duplicate retries, and concurrent version-guarded writes. `scripts/multiplayer-smoke.mjs` exercises create/join/start/action/idempotency/stale recovery against a deployed environment. CI runs the smoke script when the repository variable `MULTIPLAYER_SMOKE_URL` is configured; without that variable, deployment smoke is skipped.
 
 ## Deployment prerequisites
 
-The current repository has no backend, database, or multiplayer environment variables. Before the online mode can run in production, connect a Postgres database and configure its server-only connection string for the Vercel project. Deploy the API and frontend together on the same origin. No production environment variables should be committed to Git.
+The online API requires a Postgres database and the server-only `DATABASE_URL` configured in Vercel. Deploy the API and frontend together on the same origin. To run the deployment smoke test automatically in CI, set the repository Actions variable `MULTIPLAYER_SMOKE_URL` to the deployed app base URL; the test creates a temporary room and leaves it to expire. Never commit production environment variables to Git. A passing local unit/API suite, CI result, and live smoke test must be confirmed before calling the release verified.

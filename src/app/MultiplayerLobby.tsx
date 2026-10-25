@@ -6,15 +6,18 @@ import { EventLog } from "./EventLog";
 import { PropertyModal } from "./PropertyModal";
 import type { GameState } from "../game/types";
 
-type PublicSeat = { playerId: string; name: string; role: "politician" | "citizen" | null; joinedAt: string };
+type PublicSeat = { playerId: string; name: string; role: "politician" | "citizen" | null; joinedAt: string; lastSeenAt?: string };
 type Room = { code: string; status: "waiting" | "active" | "finished"; version: number; hostPlayerId: string; seats: PublicSeat[]; state: GameState | null; createdAt: string; expiresAt: string };
 type Credentials = { code: string; playerId: string; token: string };
 const storageKey = "amjonotar-kopal-multiplayer-seat";
 const money = (value: number) => `৳${value.toLocaleString("en-BD")}`;
+class MultiplayerRequestError extends Error {
+  constructor(message: string, readonly status: number, readonly payload: Record<string, unknown>) { super(message); }
+}
 async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   const response = await fetch(path, { ...init, headers: { "Content-Type": "application/json", ...(init.headers ?? {}) } });
-  const data = await response.json().catch(() => ({}));
-  if (!response.ok) throw new Error(typeof data.error === "string" ? data.error : "Multiplayer request failed.");
+  const data = await response.json().catch(() => ({})) as Record<string, unknown>;
+  if (!response.ok) throw new MultiplayerRequestError(typeof data.error === "string" ? data.error : "Multiplayer request failed.", response.status, data);
   return data as T;
 }
 export function MultiplayerLobby({ onBack }: { onBack: () => void }) {
@@ -26,12 +29,21 @@ export function MultiplayerLobby({ onBack }: { onBack: () => void }) {
   const [room, setRoom] = useState<Room | null>(null);
   const [error, setError] = useState("");
   const [working, setWorking] = useState(false);
+  const workingRef = useRef(false);
+  const [isOnline, setIsOnline] = useState(typeof navigator === "undefined" ? true : navigator.onLine);
   const [notice, setNotice] = useState("Create a room or join friends with a room code.");
   const [selectedPropertyId, setSelectedPropertyId] = useState<string | null>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [showEventPopups, setShowEventPopups] = useState(true);
   const [activeEvent, setActiveEvent] = useState<GameState["events"][number] | null>(null);
   const lastSeenEventId = useRef<number | null>(null);
+
+  useEffect(() => {
+    const syncOnline = () => setIsOnline(navigator.onLine);
+    window.addEventListener("online", syncOnline);
+    window.addEventListener("offline", syncOnline);
+    return () => { window.removeEventListener("online", syncOnline); window.removeEventListener("offline", syncOnline); };
+  }, []);
 
   useEffect(() => {
     const syncFullscreen = () => setIsFullscreen(Boolean(document.fullscreenElement));
@@ -49,20 +61,36 @@ export function MultiplayerLobby({ onBack }: { onBack: () => void }) {
     if (!credentials) return;
     try {
       const data = await request<{ room: Room }>(`/api/multiplayer/rooms/${encodeURIComponent(credentials.code)}`);
-      setRoom(data.room);
-      setError("");
+      setRoom((currentRoom) => !currentRoom || data.room.version >= currentRoom.version ? data.room : currentRoom);
+      setError((currentError) => currentError === "Room not found or expired." ? currentError : "");
       if (data.room.status === "finished") setNotice("Game finished. The final result is shown below.");
     } catch (e) {
-      if (!quiet) setError(e instanceof Error ? e.message : "Could not load this room.");
+      if (e instanceof MultiplayerRequestError && e.status === 404) {
+        saveCredentials(null);
+        setRoom(null);
+        setError("Room not found or expired. Create or join a room to continue.");
+      } else setError(e instanceof Error ? (quiet ? "Unable to sync with the server. Retrying automatically…" : e.message) : "Could not load this room.");
     }
-  }, [credentials]);
+  }, [credentials, saveCredentials]);
 
   useEffect(() => {
-    if (!credentials || working) return;
+    if (!credentials || !isOnline) return;
+    let stopped = false;
+    const heartbeat = async () => {
+      try { await request(`/api/multiplayer/rooms/${encodeURIComponent(credentials.code)}/heartbeat`, { method: "POST", headers: { Authorization: `Bearer ${credentials.token}` } }); }
+      catch { /* Polling reports the recoverable network/room error separately. */ }
+    };
+    void heartbeat();
+    const timer = window.setInterval(() => { if (!stopped) void heartbeat(); }, 5000);
+    return () => { stopped = true; window.clearInterval(timer); };
+  }, [credentials, isOnline]);
+
+  useEffect(() => {
+    if (!credentials || !isOnline || working) return;
     void refresh();
     const timer = window.setInterval(() => void refresh(true), 1600);
     return () => window.clearInterval(timer);
-  }, [credentials, refresh, working]);
+  }, [credentials, refresh, working, isOnline]);
 
   useEffect(() => {
     const events = room?.state?.events ?? [];
@@ -100,16 +128,20 @@ export function MultiplayerLobby({ onBack }: { onBack: () => void }) {
   }))));
 
   async function createRoom() {
+    if (workingRef.current || !isOnline) return;
+    workingRef.current = true;
     setWorking(true); setError("");
     try {
       const result = await request<{ room: Room; playerId: string; token: string }>("/api/multiplayer/rooms", { method: "POST", body: JSON.stringify({ name }) });
       const next = { code: result.room.code, playerId: result.playerId, token: result.token };
       saveCredentials(next); setRoom(result.room); setNotice("Room created. Invite at least one and up to five other players.");
     } catch (e) { setError(e instanceof Error ? e.message : "Could not create room."); }
-    finally { setWorking(false); }
+    finally { workingRef.current = false; setWorking(false); }
   }
 
   async function joinRoom() {
+    if (workingRef.current || !isOnline) return;
+    workingRef.current = true;
     setWorking(true); setError("");
     const code = joinCode.trim().toUpperCase();
     try {
@@ -117,7 +149,7 @@ export function MultiplayerLobby({ onBack }: { onBack: () => void }) {
       saveCredentials({ code: result.room.code, playerId: result.playerId, token: result.token });
       setRoom(result.room); setNotice("You joined the room. Wait for the host to start the game.");
     } catch (e) { setError(e instanceof Error ? e.message : "Could not join room."); }
-    finally { setWorking(false); }
+    finally { workingRef.current = false; setWorking(false); }
   }
 
   async function hostStart() {
@@ -126,24 +158,39 @@ export function MultiplayerLobby({ onBack }: { onBack: () => void }) {
   }
 
   async function perform(path: string, body: Record<string, unknown>) {
-    if (!credentials) return;
+    if (!credentials || workingRef.current || !isOnline) {
+      if (!isOnline) setError("You are offline. Reconnect to submit actions or sync the room.");
+      return;
+    }
+    workingRef.current = true;
     setWorking(true); setError("");
     try {
       const result = await request<{ room: Room }>(path, { method: "POST", headers: { Authorization: `Bearer ${credentials.token}` }, body: JSON.stringify(body) });
-      setRoom(result.room); setNotice("Game state synchronized.");
+      setRoom((currentRoom) => !currentRoom || result.room.version >= currentRoom.version ? result.room : currentRoom);
+      setNotice("Authoritative game state synchronized.");
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Action failed.");
+      if (e instanceof MultiplayerRequestError) {
+        if (e.payload.room && typeof e.payload.room === "object") {
+          const latestRoom = e.payload.room as Room;
+          setRoom((currentRoom) => !currentRoom || latestRoom.version >= currentRoom.version ? latestRoom : currentRoom);
+        }
+        setError(e.message);
+        if (e.status === 404 && /expired|not found/i.test(e.message)) {
+          saveCredentials(null);
+          setRoom(null);
+        }
+      } else setError(e instanceof Error ? `${e.message}. Check your connection and sync before retrying.` : "Action failed. Check your connection and sync before retrying.");
       await refresh(true);
-    } finally { setWorking(false); }
+    } finally { workingRef.current = false; setWorking(false); }
   }
 
   async function submitAction(action: Record<string, unknown>) {
-    if (!room) return;
-    await perform(`/api/multiplayer/rooms/${room.code}/actions`, { version: room.version, action });
+    if (!room || room.status !== "active" || !isMyTurn || workingRef.current) return;
+    await perform(`/api/multiplayer/rooms/${room.code}/actions`, { version: room.version, requestId: crypto.randomUUID(), action });
   }
 
   async function disconnect() {
-    if (credentials && room?.status === "waiting") {
+    if (credentials && room?.status === "waiting" && isOnline) {
       try {
         await request(`/api/multiplayer/rooms/${encodeURIComponent(credentials.code)}/leave`, {
           method: "POST",
@@ -166,16 +213,19 @@ export function MultiplayerLobby({ onBack }: { onBack: () => void }) {
     </section>
     {!credentials ? <section className="multiplayer-panel">
       <label className="multiplayer-label">YOUR DISPLAY NAME<input value={name} maxLength={24} onChange={(e) => setName(e.target.value)} placeholder="Enter a name" /></label>
-      <div className="multiplayer-actions"><button className="primary-action" disabled={working || !name.trim()} onClick={() => void createRoom()}>{working ? "PLEASE WAIT…" : "CREATE A ROOM"}</button></div>
-      <div className="multiplayer-join"><label className="multiplayer-label">ROOM CODE<input value={joinCode} maxLength={6} autoCapitalize="characters" onChange={(e) => setJoinCode(e.target.value.toUpperCase().replace(/[^A-HJ-NP-Z2-9]/g, ""))} placeholder="ABC234" /></label><button className="secondary-action" disabled={working || !name.trim() || joinCode.length !== 6} onClick={() => void joinRoom()}>JOIN ROOM ↗</button></div>
+      <div className="multiplayer-actions"><button className="primary-action" disabled={working || !isOnline || !name.trim()} onClick={() => void createRoom()}>{working ? "PLEASE WAIT…" : "CREATE A ROOM"}</button></div>
+      <div className="multiplayer-join"><label className="multiplayer-label">ROOM CODE<input value={joinCode} maxLength={6} autoCapitalize="characters" onChange={(e) => setJoinCode(e.target.value.toUpperCase().replace(/[^A-HJ-NP-Z2-9]/g, ""))} placeholder="ABC234" /></label><button className="secondary-action" disabled={working || !isOnline || !name.trim() || joinCode.length !== 6} onClick={() => void joinRoom()}>JOIN ROOM ↗</button></div>
     </section> : room ? <section className="multiplayer-panel">
       <div className="multiplayer-room-heading"><div><span className="eyebrow">ROOM CODE</span><h2>{room.code}</h2></div><button className="secondary-action" onClick={() => void navigator.clipboard?.writeText(room.code)}>COPY CODE</button></div>
       <p className="multiplayer-notice">{notice}</p>
+      {!isOnline && <p className="multiplayer-error" role="status">Connection lost. Actions are paused until this device reconnects.</p>}
+      {isOnline && credentials && <p className="multiplayer-notice">Connection: online · room state is server-authoritative</p>}
+      {room.seats.some((seat) => seat.lastSeenAt && Date.now() - new Date(seat.lastSeenAt).getTime() > 15000) && <p className="multiplayer-error" role="status">One or more players appear disconnected. Their seat is preserved; reconnecting restores their session.</p>}
       <div className="multiplayer-seats">{Array.from({ length: 6 }, (_, index) => {
         const seat = room.seats[index];
-        return <div className="multiplayer-seat" key={index}><span className="role-number">SEAT 0{index + 1} · {room.status === "waiting" ? "ROLE DRAW AT START" : (seat?.role ?? "PLAYER").toUpperCase()}</span><strong>{seat?.name ?? "Waiting for player…"}</strong><small>{seat ? (seat.playerId === credentials.playerId ? "YOU" : seat.playerId === room.hostPlayerId ? "HOST" : "CONNECTED") : "OPEN SEAT"}</small></div>;
+        return <div className="multiplayer-seat" key={index}><span className="role-number">SEAT 0{index + 1} · {room.status === "waiting" ? "ROLE DRAW AT START" : (seat?.role ?? "PLAYER").toUpperCase()}</span><strong>{seat?.name ?? "Waiting for player…"}</strong><small>{seat ? (seat.playerId === credentials.playerId ? "YOU" : seat.lastSeenAt && Date.now() - new Date(seat.lastSeenAt).getTime() > 15000 ? "DISCONNECTED" : seat.playerId === room.hostPlayerId ? "HOST" : "CONNECTED") : "OPEN SEAT"}</small></div>;
       })}</div>
-      {room.status === "waiting" && <div className="multiplayer-actions">{credentials.playerId === room.hostPlayerId ? <button className="primary-action" disabled={working || room.seats.length < 2} onClick={() => void hostStart()}>{room.seats.length >= 2 ? "START GAME" : "WAITING FOR 1 MORE PLAYER"}</button> : <p>Waiting for the host to start with at least 2 players. Keep this page open.</p>}</div>}
+      {room.status === "waiting" && <div className="multiplayer-actions">{credentials.playerId === room.hostPlayerId ? <button className="primary-action" disabled={working || !isOnline || room.seats.length < 2} onClick={() => void hostStart()}>{room.seats.length >= 2 ? "START GAME" : "WAITING FOR 1 MORE PLAYER"}</button> : <p>Waiting for the host to start with at least 2 players. Keep this page open.</p>}</div>}
       {room.state && current && <div className="multiplayer-game game-shell multiplayer-board-shell">
         <div className="game-header multiplayer-active-header">
           <div className="wordmark">আমজনতার কপাল<span>ONLINE REPUBLIC · ROOM {room.code}</span></div>
