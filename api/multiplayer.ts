@@ -5,7 +5,7 @@ import type { GameState } from "../src/game/types.js";
 
 type NeonSql = ReturnType<typeof import("@neondatabase/serverless").neon>;
 type Seat = { playerId: string; name: string; role: "politician" | "citizen" | null; tokenHash: string; joinedAt: string };
-type RoomRow = { code: string; status: "waiting" | "active" | "finished"; hostPlayerId: string; seats: Seat[]; state: GameState | null; version: number; createdAt: string; expiresAt: string };
+type RoomRow = { code: string; status: "waiting" | "active" | "finished"; hostPlayerId: string; seats: Seat[]; state: GameState | null; version: number; lastActionId?: string | null; createdAt: string; expiresAt: string };
 const codeAlphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
 const hashToken = (token: string) => createHash("sha256").update(token).digest("hex");
 const newToken = () => randomBytes(32).toString("base64url");
@@ -36,11 +36,11 @@ function seatFrom(req: VercelRequest, room: RoomRow): Seat | undefined {
   return room.seats.find((seat) => seat.tokenHash === hash);
 }
 async function readRoom(sql: NeonSql, code: string): Promise<RoomRow | null> {
-  const rows = await sql`SELECT code, status, host_player_id AS "hostPlayerId", seats, state, version, created_at AS "createdAt", expires_at AS "expiresAt" FROM multiplayer_rooms WHERE code = ${code} AND expires_at > NOW() LIMIT 1`;
+  const rows = await sql`SELECT code, status, host_player_id AS "hostPlayerId", seats, state, version, last_action_id AS "lastActionId", created_at AS "createdAt", expires_at AS "expiresAt" FROM multiplayer_rooms WHERE code = ${code} AND expires_at > NOW() LIMIT 1`;
   return (rows[0] as unknown as RoomRow) ?? null;
 }
-async function saveRoom(sql: NeonSql, room: RoomRow, expectedVersion: number) {
-  const rows = await sql`UPDATE multiplayer_rooms SET status = ${room.status}, seats = ${JSON.stringify(room.seats)}::jsonb, state = ${room.state ? JSON.stringify(room.state) : null}::jsonb, version = version + 1 WHERE code = ${room.code} AND version = ${expectedVersion} AND expires_at > NOW() RETURNING version`;
+async function saveRoom(sql: NeonSql, room: RoomRow, expectedVersion: number, actionId?: string) {
+  const rows = await sql`UPDATE multiplayer_rooms SET status = ${room.status}, seats = ${JSON.stringify(room.seats)}::jsonb, state = ${room.state ? JSON.stringify(room.state) : null}::jsonb, last_action_id = COALESCE(${actionId ?? null}, last_action_id), version = version + 1 WHERE code = ${room.code} AND version = ${expectedVersion} AND expires_at > NOW() RETURNING version`;
   return rows.length > 0;
 }
 
@@ -83,8 +83,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       state jsonb,
       version integer NOT NULL DEFAULT 0,
       created_at timestamptz NOT NULL DEFAULT NOW(),
-      expires_at timestamptz NOT NULL
+      expires_at timestamptz NOT NULL,
+      last_action_id text
     )`;
+    await sql`ALTER TABLE multiplayer_rooms ADD COLUMN IF NOT EXISTS last_action_id text`;
 
     if (parts.length === 1 && parts[0] === "rooms" && method === "POST") {
       const name = cleanName(bodyOf(req).name);
@@ -146,12 +148,22 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     if (parts[2] === "actions" && method === "POST") {
-      if (room.status !== "active" || !room.state) return send(res, 409, { error: "This room is not in an active game." });
+      if (room.status !== "active" || !room.state) return send(res, 409, { error: "This room is not in an active game.", room: publicRoom(room) });
       const body = bodyOf(req);
+      const requestId = typeof body.requestId === "string" ? body.requestId : "";
+      if (!/^[a-f0-9-]{36}$/i.test(requestId)) return send(res, 400, { error: "A valid requestId is required for every action." });
+      if (room.lastActionId === requestId) return send(res, 200, { room: publicRoom(room), duplicate: true });
       const expectedVersion = Number(body.version);
-      if (!Number.isInteger(expectedVersion) || expectedVersion !== room.version) return send(res, 409, { error: "State is out of date. Refresh before retrying.", room: publicRoom(room) });
+      if (!Number.isInteger(expectedVersion) || expectedVersion !== room.version) return send(res, 409, { error: "State is out of date. The latest room state is included.", room: publicRoom(room) });
       if (room.state.players[room.state.currentPlayerIndex]?.id !== seat.playerId) return send(res, 403, { error: "It is not your turn." });
       if (!body.action || typeof body.action !== "object" || Array.isArray(body.action)) return send(res, 400, { error: "A valid game action is required." });
+      const action = body.action as Record<string, unknown>;
+      const actionTypes = ["roll", "property", "build", "mortgage", "redeem-mortgage", "sell-property", "contribute", "vote-charter", "buy-cooperative-property", "end-turn"];
+      if (typeof action.type !== "string" || !actionTypes.includes(action.type)) return send(res, 400, { error: "Unknown multiplayer action type." });
+      if (["build", "mortgage", "redeem-mortgage", "sell-property"].includes(action.type) && typeof action.spaceId !== "string") return send(res, 400, { error: "This action requires a valid spaceId." });
+      if (action.type === "property" && !["buy", "decline", "lease"].includes(String(action.action))) return send(res, 400, { error: "Unknown property decision." });
+      if (action.type === "build" && !["house", "hotel"].includes(String(action.building))) return send(res, 400, { error: "Unknown building type." });
+      if (action.type === "contribute" && (!Number.isInteger(action.amount) || Number(action.amount) <= 0)) return send(res, 400, { error: "Contribution amount must be a positive integer." });
       let state: GameState;
       try {
         state = applyMultiplayerAction(room.state, seat.playerId, body.action as MultiplayerAction);
@@ -159,9 +171,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         return send(res, 422, { error: error instanceof Error ? error.message : "That action is not legal." });
       }
       const next = { ...room, status: state.phase === "game-over" ? "finished" as const : "active" as const, state, version: room.version + 1 };
-      if (!await saveRoom(sql, next, expectedVersion)) {
+      if (!await saveRoom(sql, next, expectedVersion, requestId)) {
         const latest = await readRoom(sql, code);
-        return send(res, 409, { error: "Another action was processed first. Refresh the game state.", room: latest ? publicRoom(latest) : undefined });
+        if (latest?.lastActionId === requestId) return send(res, 200, { room: publicRoom(latest), duplicate: true });
+        return send(res, 409, { error: "Another action was processed first. The latest room state is included.", room: latest ? publicRoom(latest) : undefined });
       }
       return send(res, 200, { room: { ...publicRoom(next), version: expectedVersion + 1 } });
     }
