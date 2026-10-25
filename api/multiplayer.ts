@@ -170,7 +170,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       if (room.state.players[room.state.currentPlayerIndex]?.id !== seat.playerId) return send(res, 403, { error: "It is not your turn." });
       if (!body.action || typeof body.action !== "object" || Array.isArray(body.action)) return send(res, 400, { error: "A valid game action is required." });
       const action = body.action as Record<string, unknown>;
-      const actionTypes = ["roll", "property", "build", "mortgage", "redeem-mortgage", "sell-property", "contribute", "vote-charter", "buy-cooperative-property", "end-turn"];
+      const actionTypes = ["roll", "property", "build", "mortgage", "redeem-mortgage", "sell-property", "contribute", "buy-cooperative-property", "end-turn"];
       if (typeof action.type !== "string" || !actionTypes.includes(action.type)) return send(res, 400, { error: "Unknown multiplayer action type." });
       if (["build", "mortgage", "redeem-mortgage", "sell-property"].includes(action.type) && typeof action.spaceId !== "string") return send(res, 400, { error: "This action requires a valid spaceId." });
       if (action.type === "property" && !["buy", "decline", "lease"].includes(String(action.action))) return send(res, 400, { error: "Unknown property decision." });

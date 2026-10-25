@@ -20,10 +20,10 @@ export interface GameEvent { id: number; message: string; kind: "system" | "move
 export interface GameState {
   schemaVersion: 1; phase: GamePhase; players: Player[]; currentPlayerIndex: number;
   publicFund: number; cooperativeFund: number; properties: Record<string, PropertyState>;
-  cooperativePropertyIds: string[]; charterVotes: string[]; charterPendingRound: number | null; charterActivated: boolean;
+  cooperativePropertyIds: string[];
   cardDrawCounts: { community: number; chance: number }; extraRollAvailable: boolean;
   pendingPropertyId: string | null; events: GameEvent[]; nextEventId: number;
-  round: number; winner: string | null;
+  round: number; /** Player id of the last player standing; null while the game is running. */ winner: string | null;
 }
 export interface NewGameOptions { humanRole: PlayerRole; }
 export type DiceRoller = (count: number, random: () => number) => number[];

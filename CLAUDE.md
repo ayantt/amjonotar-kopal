@@ -7,7 +7,7 @@ Build **Amjonotar Kopal**, a fictional Bangladesh-inspired satirical property bo
 - At game setup, the human chooses Politician or Citizen; assign the other three seats to AI opponents so the match always has one Politician and three Citizens total.
 - No local pass-and-play. AI turns run automatically with visible turn/action feedback and a way to review their decisions.
 - AI follows the same role rules, action validation, cash limits, and information availability as a human. No cheating or hidden-state access.
-- Politician privileges are intentional. Citizens' victory requires cooperation and all three Citizens active; AI Citizens should coordinate through explicit game-state information and the shared cooperative-fund rules.
+- Politician privileges are intentional. The winner is the last player standing: the game ends when exactly one player is not bankrupt (RD-125). Citizens may cooperate through the shared cooperative fund, but it confers no victory.
 - Use fictional places/institutions/characters, not identifiable real politicians or parties.
 - Bangla-ready responsive UI; English code identifiers.
 - Pure TypeScript game engine and AI strategy modules; no React/browser imports in `src/game`.

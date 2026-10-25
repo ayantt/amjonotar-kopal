@@ -9,8 +9,10 @@ Exactly four seats: one human-controlled player and three AI-controlled players.
 |---|---:|---:|
 | Starting cash | ৳2,000 | ৳1,500 |
 | Dice | 2 | 1 |
-| GO pass/landing reward | ৳400 | ৳200 |
-| Exact GO landing bonus | +৳200 | +৳100 |
+| GO pass/landing reward | ৳200 | ৳400 |
+| Exact GO landing bonus | +৳100 | +৳200 |
+
+The GO rewards are deliberately larger for Citizens: the Politician's two dice cross GO about twice as often, so GO income per turn is roughly equal (RD-127). All of these numbers live in `src/game/rules.ts`.
 
 Order: Politician, Citizen 1, Citizen 2, Citizen 3. Public and cooperative funds start at ৳0. Cash cannot be negative; unaffordable payments enter debt resolution.
 
@@ -44,7 +46,7 @@ Citizen on another Citizen's property pays normal development-adjusted rent. Cit
 - Land base rent is 10% of purchase price rounded up, with a ৳10 minimum. Railroad base rent is ৳50 multiplied by the number of railroads controlled by its owner/leaseholder. Citizen visitors pay double on Politician-controlled railroads; Politician visitors pay half on Citizen-controlled railroads.
 - Utility charge uses the visitor's roll total: Citizen-controlled utility costs 4× that total; Politician-controlled utility costs 10× plus ৳30. Politician visitors pay no utility charge.
 - Politician visitors pay half rent on Citizen-controlled land. Politician leases collect half land rent. An active leaseholder receives rent instead of the property owner, preventing duplicate payouts. Citizen leases expire after five GO passes; Politician leases are permanent.
-- Income Tax currently charges Citizens ৳100 and the Politician ৳50. Development Levy charges Citizens ৳100 and exempts the Politician. Politician landing on Public Plaza withdraws the available public treasury; other players receive no jackpot.
+- Income Tax and the Development Levy each charge every player ৳100 as a base amount (Politician included, RD-127), paid to the public treasury. Taxes escalate (RD-126): every 4 rounds each tax rises by its base amount (rounds 1–4: ৳100, 5–8: ৳200, 9–12: ৳300, …), so a game cannot stall forever. Any player landing on Public Plaza withdraws the entire public treasury.
 - These are initial Phase 2 values. Card effects and debt/bankruptcy settlement are implemented. Cooperative purchases, victory triggers, mortgage redemption, and houses/hotels are implemented (see sections below); player-directed debt choices remain future work.
 
 ## Implemented card and debt resolution
@@ -55,7 +57,7 @@ Citizen on another Citizen's property pays normal development-adjusted rent. Cit
 - Optional Citizen contributions are automatically skipped for the human player (to avoid silently spending their cash without a choice); AI Citizens contribute only when they can afford the amount. The human receives an event-log explanation. This is a temporary interaction rule until explicit card-choice UI is added.
 - Conditional public-fund collections pay only the available amount; any shortfall is waived rather than carried as hidden debt. Conditional public payments are skipped when the public-fund condition is not met.
 - Payments first use available cash, then automatically mortgage eligible unmortgaged owned properties using the debtor's role-specific loan amount and processing-fee rules. If the bill still cannot be paid, the debtor is declared bankrupt, remaining cash is set to zero, owned property is transferred according to the current rule (Citizen assets go to the Politician; Politician assets go to the named creditor where applicable), and the player's leases are cleared.
-- Bankruptcy ends the game if the Politician goes bankrupt (Citizens win) or when two Citizens go bankrupt (Politician wins). The cooperative Citizen victory condition is implemented in initial form as described below; mortgage redemption is implemented.
+- Bankruptcy removes the player from the game; the game ends only when a single non-bankrupt player remains (see Victory below). Mortgage redemption is implemented.
 - The event log records card draws, payments, mortgage actions, bankruptcy, and skip-turn effects. The board UI shows deck draw counts and a game-over message.
 
 ## Houses and hotels
@@ -71,31 +73,24 @@ Citizen on another Citizen's property pays normal development-adjusted rent. Cit
 Citizen pays normal fare on Citizen-controlled railroad, double fare on Politician-controlled railroad. Politician pays nothing; if Citizen-controlled, Politician pays half fare as “Public Service Contribution.” Citizens pay utility charge plus service-adjustment fee if Politician-controlled. Politician pays nothing and collects half utility charge from any Citizen landing there, or full charge plus adjustment if Politician-controlled. Store formulas in data.
 
 ## Cards and public fund
-Draw from Chance/Community Chest; shuffle at start and reshuffle when draw pile empties. Card effects are typed engine actions. Taxes and penalties go to public fund unless specified. Politician landing on Free Parking withdraws all available public funds; if empty, gets provisional ৳200 government-backed support recorded as liability. Citizens get no jackpot. Citizens pay Luxury Tax plus wealth surcharge when they own more than two properties; Politician is exempt. Politician receives 25% of Citizen Luxury Tax only from available public funds—never create money silently.
+Draw from Chance/Community Chest; shuffle at start and reshuffle when draw pile empties. Card effects are typed engine actions. Taxes and penalties go to public fund unless specified. Any player landing on Free Parking (Public Plaza) withdraws all available public funds; there is no support payment when the treasury is empty. Luxury Tax (Development Levy) is a flat escalating charge on every player; the earlier wealth surcharge, Politician exemption and 25% Politician share are not implemented (see Taxes under Implemented property-loop details).
 
 ## Public services and jail
 Citizen landing on Politician-controlled Water Works pays standard charge plus maintenance even if service is disrupted. Politician pays nothing; collects half water charge from Citizens, or full plus emergency fee when Politician-controlled. Debt resolution and lost turns are separate states. Jailed Citizens may pay bail or use release card and do not collect rent while jailed. Politician may pay processing fee to remain free unless investigation overrides privilege.
 
 ## Debt and bankruptcy
-Citizens may use cash, sell assets, mortgage (Citizen receives 47.5% net after fee; Politician receives full price; mortgaged property earns no rent until redemption), or request cooperative rescue. Politician mortgages for the full listed price with no processing fee; like Citizens, the Politician collects no rent from mortgaged property until redemption. Citizen-to-Citizen trades allowed. Selling to Politician requires unanimous active-Citizen approval. If still unable to pay, Citizen goes bankrupt and remaining cash/property transfer to Politician after atomic settlement. Politician cannot bankrupt from ordinary debt; government support covers shortfall and records liability.
+Citizens may use cash, sell assets, mortgage (Citizen receives 47.5% net after fee; Politician receives full price; mortgaged property earns no rent until redemption), or request cooperative rescue. Politician mortgages for the full listed price with no processing fee; like Citizens, the Politician collects no rent from mortgaged property until redemption. Citizen-to-Citizen trades allowed. Selling to Politician requires unanimous active-Citizen approval. If still unable to pay, Citizen goes bankrupt and remaining cash/property transfer to Politician after atomic settlement. The Politician can also go bankrupt (RD-125); there is no government-support safety net in the current rules.
 
-## Cooperative fund and victory
-Citizens can contribute ৳100 or ৳500 through the UI to a separate fund; the Politician cannot withdraw, tax, or seize it. A Citizen may purchase an unclaimed property from the fund when it can cover the listed price. Cooperative property rent flows into the cooperative fund. The UI supports a majority vote for the People's Charter; once approved with at least ৳1,000 in the fund, the Charter is pending until the next Citizen round. The Citizens must keep all three active, control at least eight properties jointly (including cooperative properties), retain combined cash of at least ৳3,000, and preserve at least ৳1,000 in the cooperative fund for the joint victory to trigger.
+## Cooperative fund
+Citizens can contribute ৳100 or ৳500 through the UI to a separate fund; the Politician cannot withdraw, tax, or seize it. A Citizen may purchase an unclaimed property from the fund when it can cover the listed price. Cooperative property rent flows into the cooperative fund. The fund confers no victory by itself (the People's Charter was removed by RD-125); it is a voluntary mutual-aid tool.
 
-**Politician wins** if any trigger occurs:
-1. Controls at least 7 properties, including active Politician leases.
-2. Reaches ৳8,000 in cash plus the listed purchase value of individually owned property (leases and liabilities are not included in this provisional calculation).
-3. Two Citizens go bankrupt.
+## Victory — last player standing (RD-125)
+The game continues until **exactly one player is not bankrupt**. That player wins, whether Politician or Citizen. There is no other victory condition: owning many properties, personal wealth, and the cooperative fund do not end the game.
 
-**Citizens win together** only if all are true:
-1. All three Citizens remain active.
-2. They collectively control at least 8 properties, counting each cooperative property once.
-3. Their combined cash is at least ৳3,000, excluding cooperative fund.
-4. They contribute at least ৳1,000 to the cooperative fund for the People's Charter.
-5. Fund remains at or above ৳1,000 until start of next Citizen round.
-6. Charter is formally activated.
-
-Check victory after every completed action and at round start. If both trigger in one atomic action, Politician victory takes precedence provisionally.
+- A bankrupt player takes no further turns, owns nothing, and cannot be revived.
+- Victory is checked immediately after every bankruptcy. Once a winner is declared the game is terminal: rolls, sales, builds, mortgages, contributions and turn changes are all rejected, and no money moves.
+- The winner is recorded as that player's id in `GameState.winner`.
+- Bankruptcy inheritance: a bankrupt player's property passes to the creditor if the creditor is a solvent player; otherwise (public treasury, taxes, cards) it returns to the unowned market with any buildings demolished. Leases held by the bankrupt player end. (`citizenBankruptcyToPolitician` in `rules.ts` can restore the older "Citizen assets go to the Politician" rule; it is off for balance, RD-127.)
 
 ## Deferred rules
 Negotiation/private deals and optional Election Day challenge are deferred. Do not implement until core game is stable and rules are finalized.

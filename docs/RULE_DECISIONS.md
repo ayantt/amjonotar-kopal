@@ -6,7 +6,7 @@ Track unresolved conflicts here. When resolving one, update the rulebook/catalog
 - RD-001: exactly one Politician and three Citizens.
 - RD-002: single-player; one human against three local AI opponents; no pass-and-play.
 - RD-003: human chooses a role; remaining seats are assigned to AI while preserving one Politician and three Citizens.
-- RD-004: Politician privilege intentional; Citizen victory cooperative.
+- RD-004: Politician privilege intentional. (Cooperative Citizen victory was superseded by RD-125.)
 - RD-005: fictional composites only.
 - RD-006: integer taka; public and cooperative funds separate.
 - RD-007: engine validates every action; AI chooses only from legal actions.
@@ -17,21 +17,26 @@ Track unresolved conflicts here. When resolving one, update the rulebook/catalog
 - RD-011: AI receives only player-appropriate information; no cheating or hidden-state access.
 - RD-012: AI decisions are bounded, validated, and logged in concise user-facing language.
 
+- **RD-125: Victory is last player standing.** The game runs until exactly one player is not bankrupt; that player (Politician or Citizen) wins. The 7-property, ৳8,000 wealth, two-Citizen-bankruptcy and People's Charter victories were removed, along with Charter voting. Open follow-ups: game length and balance (see Playtest notes in the final audit report).
+
+- **RD-126: Tax escalation.** Every `taxEscalationEveryRounds` (4) rounds each tax rises by `taxEscalationPercent` (100%) of its base amount. Without it, money simply recirculates and some seeded games never ended (2 of 1,000 exceeded 20,000 turns).
+- **RD-127: Balance target — the Politician wins about 70% of seeded all-AI games.** Measured over 1,000 fresh-seed games: 69% Politician wins, every game finishes, median 258 turns (p90 409). Findings behind the tuning: with *no* Politician privileges the AI Politician already wins ~70% (it moves first, plays better, and gets the favourable card decks), and the Politician never went bankrupt under the old numbers (Citizens were killed by taxes 44%, rent 40%, cards 14%); the privileges that fed on the public treasury (tax exemption, Plaza jackpot, Citizen-asset inheritance) pushed the win rate to ~100%. **Kept:** two dice, ৳2,000 start, half rent as a visitor, double railroad fares and 10×+৳30 utility charges for Citizens, full-price mortgage, role-specific cards, cheap/maintenance-free building. **Changed:** GO ৳200 (Politician) vs ৳400 (Citizen), equal taxes for everyone, Plaza open to all, bankrupt assets go to the creditor, tax escalation (RD-126). The target is enforced by `tests/game/balance.test.ts` (60–80% band over 300 seeded games). Caveat: the number is for AI-vs-AI play; a human Citizen may do better or worse than the AI.
+
 ## Open decisions
-- **RD-101 Politician wealth — provisional implementation:** ৳8,000 is cash plus listed purchase value of individually owned properties; leases and liabilities are excluded until balancing review.
-- **RD-102 Leases in Citizen property count:** Provisional: only owned and cooperative properties count, not leased property.
+- ~~RD-101 Politician wealth~~ — obsolete: property-count and wealth victory conditions were removed (RD-125).
+- ~~RD-102 Leases in Citizen property count~~ — obsolete: property-count and wealth victory conditions were removed (RD-125).
 - **RD-103 Public fund shortfall — resolved for Phase 3:** “If available” collections transfer only the available balance; shortfalls are waived, not carried as hidden liabilities. Revisit if explicit debt instruments are added.
 - **RD-104 Lease rent:** Provisional: active leaseholder alone collects rent; owner does not also collect.
 - **RD-105 Debt order — provisional implementation:** The engine automatically spends cash, then mortgages owned unmortgaged properties using the role-specific loan terms (Citizen: half price less 5% fee; Politician: full price, no fee), then declares bankruptcy if the amount remains unpaid. Manual mortgage redemption is implemented; player-selected liquidation and cooperative rescue are deferred.
-- **RD-106 Cooperative vote:** Majority of active Citizens; Citizen victory still requires all three active.
+- ~~RD-106 Cooperative vote~~ — obsolete: the People's Charter and its vote were removed (RD-125).
 - **RD-107 Doubles:** Extra roll after resolving landing, maximum two consecutive bonus rolls. **Status: not implemented in code** (the Constitution now says so); extra rolls currently come only from the Public Holiday card. Implementing it would further favour the Politician, so decide together with balance tuning.
 - **RD-108 Luxury tax contribution:** Politician receives 25% only from available public fund; no money created silently.
 - **RD-109 Maintenance:** ৳50 per house and provisional ৳200 per hotel each time player passes GO.
 - **RD-110 Multi-player card payment failure — resolved for Phase 3:** Process Citizens in player-array order; each transfer invokes the same cash/mortgage/bankruptcy resolver before continuing.
 
-- **RD-121 Buildings on ownership change (partly resolved):** Buildings are demolished when the Politician sells a property back to the government (it becomes unowned land). **Still open:** buildings currently survive a Citizen-to-Politician sale and a Citizen bankruptcy transfer (the Politician inherits them and pays no maintenance). Bankruptcy transfer also clears the mortgage flag for free. Decide whether transferred buildings should be demolished and whether inherited mortgages should survive.
-- **RD-122 Politician bankruptcy conflict (open):** The rulebook's "Debt and bankruptcy" section says the Politician cannot go bankrupt from ordinary debt (government support covers it), but the implemented rule and RD-114 end the game in a Citizen victory when the Politician goes bankrupt. Pick one.
-- **RD-123 Politician wealth and mortgages (open balance risk):** The ৳8,000 wealth test counts the full listed value of owned property even when mortgaged, while the Politician receives the full price in cash when mortgaging. Mortgaging therefore counts the same value twice toward the wealth victory.
+- **RD-121 Buildings on ownership change (partly resolved; bankruptcy to the market also demolishes):** Buildings are demolished when the Politician sells a property back to the government (it becomes unowned land). **Still open:** buildings currently survive a Citizen-to-Politician sale and a Citizen bankruptcy transfer (the Politician inherits them and pays no maintenance). Bankruptcy transfer also clears the mortgage flag for free. Decide whether transferred buildings should be demolished and whether inherited mortgages should survive.
+- **RD-122 Politician bankruptcy (resolved by RD-125):** the Politician can go bankrupt like anyone else and the game continues if two or more players remain. The rulebook's old "government support" sentence was removed.
+- ~~RD-123~~ obsolete: the ৳8,000 wealth victory (and its mortgage double-count) was removed (RD-125).
 - **RD-124 Community Service (resolved):** CH-11 is "contribute ৳100 to the public fund or lose the next turn"; the turn is lost only when the contribution is declined or unaffordable.
 
 Never silently invent behavior for unresolved rules. Mark decision resolved, record rationale, update docs, and add normal/edge-case tests.
@@ -40,12 +45,12 @@ Never silently invent behavior for unresolved rules. Mark decision resolved, rec
 - RD-111: Decks are catalog-ordered, not shuffled, for deterministic tests. Shuffling and discard piles remain deferred.
 - RD-112: Optional contributions are skipped automatically for a human player because a card-choice interaction is not yet implemented; AI contributes only when affordable.
 - RD-113: Card draws are deterministic and cycle through the 16-card catalog in order; deck draw counts are tracked in state.
-- RD-114: Citizen bankruptcy transfers owned assets to the Politician. Politician bankruptcy ends the game in a Citizen victory. The Politician wins on the second Citizen bankruptcy.
+- RD-114: Citizen bankruptcy transfers owned assets to the Politician while the Politician is in play. Bankruptcy no longer ends the game by itself (superseded by RD-125).
 
 ## Cooperative economy implementation notes
 - RD-115: Citizen contributions are currently explicit ৳100/৳500 actions; no forced contributions are made by the UI.
 - RD-116: Cooperative properties are tracked separately from individual owners; rent is paid into the cooperative fund.
-- RD-117: Charter activation requires a majority of active Citizen votes and at least ৳1,000 in the cooperative fund. The fund and victory thresholds are checked at the next Citizen round.
-- RD-118: Politician victory checks are evaluated after movement/property actions and at turn advancement: seven controlled properties, ৳8,000 cash plus owned-property value, or two bankrupt Citizens.
+- ~~RD-117~~ obsolete: Charter activation removed (RD-125).
+- ~~RD-118~~ obsolete: the 7-property, ৳8,000 and two-bankruptcy Politician victories were removed (RD-125).
 
-- RD-119: Cooperative property purchases can currently be made by the current Citizen when the fund covers the price; a separate majority spending vote is deferred to avoid blocking the MVP. Charter activation still requires a majority vote.
+- RD-119: Cooperative property purchases can currently be made by the current Citizen when the fund covers the price; a separate majority spending vote is deferred.

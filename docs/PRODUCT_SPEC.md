@@ -6,12 +6,12 @@
 **Platform:** responsive browser app; one human versus three local AI opponents  
 **Status:** specification/scaffold
 
-The game uses a familiar roll-move-property-rent-cards loop. Its central asymmetry is institutional: the Politician receives privileges while Citizens bear fees and service failures. Citizens win only through coordinated action. The human competes against three computer-controlled seats, not other local human players.
+The game uses a familiar roll-move-property-rent-cards loop. Its central asymmetry is institutional: the Politician receives privileges while Citizens bear fees and service failures. The game is won by being the last player who is not bankrupt. The human competes against three computer-controlled seats, not other local human players.
 
 ## Goals
 - Playable, understandable, replayable single-player game.
 - Satire expressed through mechanics, fictional spaces, card text, and event log.
-- Strong Politician advantage but a meaningful Citizen cooperative path.
+- Strong Politician advantage but a winnable game for Citizens as last player standing (balance to be tuned).
 - AI opponents that make legible, role-appropriate decisions.
 - Deterministic, testable rules and simple local setup.
 
@@ -25,7 +25,7 @@ Exactly four seats: one human-controlled seat and three AI-controlled seats. The
 - AI takes turns automatically and should not require the human to click through routine actions.
 - AI may choose only legal actions exposed by the engine; the engine validates every choice.
 - AI must use only information available to that player and public game state.
-- Citizens should coordinate around shared objectives using the shared cooperative fund and explicit contribution/voting mechanics, without secret communication.
+- Citizens should coordinate around shared objectives using the shared cooperative fund and explicit contribution mechanics, without secret communication.
 - AI decisions should be logged in plain language and visible in a compact event log or expandable reasoning panel.
 - Provide a brief animation or status indicator during AI turns and a way to reduce/skip animation.
 - Use a deterministic injectable random source for tests. Avoid unbounded decision loops; each AI turn must resolve or return a safe fallback.
@@ -47,4 +47,4 @@ Start game → human chooses role → active player rolls role-appropriate dice 
 Bold, colorful, editorial satire influenced by fictional election posters, receipts, and public notices. Readability before decoration. Satirize systems and power structures, not protected groups or real individuals.
 
 ## Success criteria
-A user can start and finish a game without dev tools; the user controls exactly one seat; the other three seats act automatically; rules are consistent; Citizen cooperation is understandable; AI completes turns without illegal actions or deadlocks; engine tests cover core mechanics/victory; clean checkout builds.
+A user can start and finish a game without dev tools; the user controls exactly one seat; the other three seats act automatically; rules are consistent; the last-player-standing rule is understandable; AI completes turns without illegal actions or deadlocks; engine tests cover core mechanics/victory; clean checkout builds.
