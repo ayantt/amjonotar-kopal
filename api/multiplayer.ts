@@ -1,6 +1,6 @@
 import { randomBytes, createHash } from "node:crypto";
 import type { VercelRequest, VercelResponse } from "@vercel/node";
-import type { MultiplayerAction } from "../src/game/engine";
+import { applyMultiplayerAction, createMultiplayerGame, type MultiplayerAction } from "../src/game/engine";
 import type { GameState } from "../src/game/types";
 
 type NeonSql = ReturnType<typeof import("@neondatabase/serverless").neon>;
@@ -132,7 +132,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       const expectedVersion = Number(bodyOf(req).version);
       if (!Number.isInteger(expectedVersion) || expectedVersion !== room.version) return send(res, 409, { error: "The room changed. Refresh and try again." });
       const names = room.seats.map((item) => item.name);
-      const { createMultiplayerGame } = await import("../src/game/engine");
       const generatedState = createMultiplayerGame(names);
       // Keep the stable room-seat IDs in the canonical game state so each
       // browser's seat token remains bound to the same player after start.
@@ -155,7 +154,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       if (!body.action || typeof body.action !== "object" || Array.isArray(body.action)) return send(res, 400, { error: "A valid game action is required." });
       let state: GameState;
       try {
-        const { applyMultiplayerAction } = await import("../src/game/engine");
         state = applyMultiplayerAction(room.state, seat.playerId, body.action as MultiplayerAction);
       } catch (error) {
         return send(res, 422, { error: error instanceof Error ? error.message : "That action is not legal." });
