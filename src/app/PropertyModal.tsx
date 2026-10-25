@@ -80,5 +80,5 @@ export function PropertyModal({
           }}>MORTGAGE PROPERTY <span>+{money(getMortgageTerms(current.role, selectedSpace.price).netAdvance)}</span></button>}
         </div></footer>
       </section>
-    </div>};
+    </div>;
 }
