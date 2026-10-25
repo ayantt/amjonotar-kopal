@@ -4,7 +4,7 @@ import { getLegalPropertyActions } from "../game/properties";
 import { getBuildingCost } from "../game/engine";
 import type { GameState } from "../game/types";
 
-type PublicSeat = { playerId: string; name: string; role: "politician" | "citizen"; joinedAt: string };
+type PublicSeat = { playerId: string; name: string; role: "politician" | "citizen" | null; joinedAt: string };
 type Room = { code: string; status: "waiting" | "active" | "finished"; version: number; hostPlayerId: string; seats: PublicSeat[]; state: GameState | null; createdAt: string; expiresAt: string };
 type Credentials = { code: string; playerId: string; token: string };
 const storageKey = "amjonotar-kopal-multiplayer-seat";
@@ -61,7 +61,7 @@ export function MultiplayerLobby({ onBack }: { onBack: () => void }) {
     try {
       const result = await request<{ room: Room; playerId: string; token: string }>("/api/multiplayer/rooms", { method: "POST", body: JSON.stringify({ name }) });
       const next = { code: result.room.code, playerId: result.playerId, token: result.token };
-      saveCredentials(next); setRoom(result.room); setNotice("Room created. Share the code with three other players.");
+      saveCredentials(next); setRoom(result.room); setNotice("Room created. Invite at least one and up to five other players.");
     } catch (e) { setError(e instanceof Error ? e.message : "Could not create room."); }
     finally { setWorking(false); }
   }
@@ -119,7 +119,7 @@ export function MultiplayerLobby({ onBack }: { onBack: () => void }) {
     <section className="hero multiplayer-hero">
       <p className="eyebrow">ONLINE MODE · ROOM-CODE MULTIPLAYER</p>
       <h1>Play<br/><em>together.</em></h1>
-      <p className="intro">Create a private room and invite three other players. Each player uses their own device; the server synchronizes turns and validates game actions.</p>
+      <p className="intro">Create a private room and invite 1–5 other players. The host can start with 2–6 players. At game start, one player is randomly selected as Politician; everyone else becomes a Citizen.</p>
     </section>
     {!credentials ? <section className="multiplayer-panel">
       <label className="multiplayer-label">YOUR DISPLAY NAME<input value={name} maxLength={24} onChange={(e) => setName(e.target.value)} placeholder="Enter a name" /></label>
@@ -128,11 +128,11 @@ export function MultiplayerLobby({ onBack }: { onBack: () => void }) {
     </section> : room ? <section className="multiplayer-panel">
       <div className="multiplayer-room-heading"><div><span className="eyebrow">ROOM CODE</span><h2>{room.code}</h2></div><button className="secondary-action" onClick={() => void navigator.clipboard?.writeText(room.code)}>COPY CODE</button></div>
       <p className="multiplayer-notice">{notice}</p>
-      <div className="multiplayer-seats">{Array.from({ length: 4 }, (_, index) => {
+      <div className="multiplayer-seats">{Array.from({ length: 6 }, (_, index) => {
         const seat = room.seats[index];
-        return <div className="multiplayer-seat" key={index}><span className="role-number">SEAT 0{index + 1} · {index === 0 ? "POLITICIAN" : "CITIZEN"}</span><strong>{seat?.name ?? "Waiting for player…"}</strong><small>{seat ? (seat.playerId === credentials.playerId ? "YOU" : seat.playerId === room.hostPlayerId ? "HOST" : "CONNECTED") : "OPEN SEAT"}</small></div>;
+        return <div className="multiplayer-seat" key={index}><span className="role-number">SEAT 0{index + 1} · {room.status === "waiting" ? "ROLE DRAW AT START" : (seat?.role ?? "PLAYER").toUpperCase()}</span><strong>{seat?.name ?? "Waiting for player…"}</strong><small>{seat ? (seat.playerId === credentials.playerId ? "YOU" : seat.playerId === room.hostPlayerId ? "HOST" : "CONNECTED") : "OPEN SEAT"}</small></div>;
       })}</div>
-      {room.status === "waiting" && <div className="multiplayer-actions">{credentials.playerId === room.hostPlayerId ? <button className="primary-action" disabled={working || room.seats.length !== 4} onClick={() => void hostStart()}>{room.seats.length === 4 ? "START GAME" : `WAITING FOR ${4 - room.seats.length} PLAYER(S)`}</button> : <p>Waiting for the host to start. Keep this page open.</p>}</div>}
+      {room.status === "waiting" && <div className="multiplayer-actions">{credentials.playerId === room.hostPlayerId ? <button className="primary-action" disabled={working || room.seats.length < 2} onClick={() => void hostStart()}>{room.seats.length >= 2 ? "START GAME" : "WAITING FOR 1 MORE PLAYER"}</button> : <p>Waiting for the host to start with at least 2 players. Keep this page open.</p>}</div>}
       {room.state && <div className="multiplayer-game">
         <div className="multiplayer-room-heading"><div><span className="eyebrow">ROUND {room.state.round}</span><h2>{room.status === "finished" ? "GAME OVER" : current ? `${current.name}'s turn` : "Game in progress"}</h2></div><span className="multiplayer-version">STATE v{room.version}</span></div>
         {room.state.phase === "game-over" && <p className="multiplayer-result">{room.state.winner === "citizens" ? "The Citizens win together." : "The Politician wins."}</p>}
