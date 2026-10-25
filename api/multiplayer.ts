@@ -131,7 +131,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (parts[2] === "heartbeat" && method === "POST") {
       // Presence is deliberately separate from the game version: heartbeat
       // traffic must not create false stale-state conflicts for game actions.
-      await sql`UPDATE multiplayer_rooms SET seats = (SELECT jsonb_agg(CASE WHEN seat->>'playerId' = ${seat.playerId} THEN seat || jsonb_build_object('lastSeenAt', NOW()::text) ELSE seat END) FROM jsonb_array_elements(seats) AS seat) WHERE code = ${code} AND expires_at > NOW()`;
+      await sql`UPDATE multiplayer_rooms SET seats = (SELECT jsonb_agg(CASE WHEN entry.seat->>'playerId' = ${seat.playerId} THEN entry.seat || jsonb_build_object('lastSeenAt', NOW()::text) ELSE entry.seat END ORDER BY entry.ordinality) FROM jsonb_array_elements(seats) WITH ORDINALITY AS entry(seat, ordinality)) WHERE code = ${code} AND expires_at > NOW()`;
       return send(res, 204, {});
     }
 
