@@ -69,7 +69,7 @@ export function MultiplayerLobby({ onBack }: { onBack: () => void }) {
         saveCredentials(null);
         setRoom(null);
         setError("Room not found or expired. Create or join a room to continue.");
-      } else if (!quiet) setError(e instanceof Error ? e.message : "Could not load this room.");
+      } else setError(e instanceof Error ? (quiet ? "Unable to sync with the server. Retrying automatically…" : e.message) : "Could not load this room.");
     }
   }, [credentials, saveCredentials]);
 
@@ -128,16 +128,20 @@ export function MultiplayerLobby({ onBack }: { onBack: () => void }) {
   }))));
 
   async function createRoom() {
+    if (workingRef.current || !isOnline) return;
+    workingRef.current = true;
     setWorking(true); setError("");
     try {
       const result = await request<{ room: Room; playerId: string; token: string }>("/api/multiplayer/rooms", { method: "POST", body: JSON.stringify({ name }) });
       const next = { code: result.room.code, playerId: result.playerId, token: result.token };
       saveCredentials(next); setRoom(result.room); setNotice("Room created. Invite at least one and up to five other players.");
     } catch (e) { setError(e instanceof Error ? e.message : "Could not create room."); }
-    finally { setWorking(false); }
+    finally { workingRef.current = false; setWorking(false); }
   }
 
   async function joinRoom() {
+    if (workingRef.current || !isOnline) return;
+    workingRef.current = true;
     setWorking(true); setError("");
     const code = joinCode.trim().toUpperCase();
     try {
@@ -145,7 +149,7 @@ export function MultiplayerLobby({ onBack }: { onBack: () => void }) {
       saveCredentials({ code: result.room.code, playerId: result.playerId, token: result.token });
       setRoom(result.room); setNotice("You joined the room. Wait for the host to start the game.");
     } catch (e) { setError(e instanceof Error ? e.message : "Could not join room."); }
-    finally { setWorking(false); }
+    finally { workingRef.current = false; setWorking(false); }
   }
 
   async function hostStart() {
