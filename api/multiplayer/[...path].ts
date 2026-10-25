@@ -11,7 +11,7 @@ const codeAlphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
 const hashToken = (token: string) => createHash("sha256").update(token).digest("hex");
 const newToken = () => randomBytes(32).toString("base64url");
 const newCode = () => Array.from(randomBytes(6), (byte) => codeAlphabet[byte % codeAlphabet.length]).join("");
-const cleanName = (value: unknown) => typeof value === "string" ? value.trim().replace(/\\s+/g, " ").slice(0, 24) : "";
+const cleanName = (value: unknown) => typeof value === "string" ? value.trim().replace(/\s+/g, " ").slice(0, 24) : "";
 const publicRoom = (room: RoomRow) => ({
   code: room.code,
   status: room.status,
@@ -62,7 +62,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       created_at timestamptz NOT NULL DEFAULT NOW(),
       expires_at timestamptz NOT NULL
     )`;
-    const pathname = new URL(req.url ?? "/", "https://multiplayer.invalid").pathname.replace(/\\/+$/, "");
+    const pathname = new URL(req.url ?? "/", "https://multiplayer.invalid").pathname.replace(/\/+$/, "");
     const parts = pathname.split("/").filter(Boolean).slice(2);
     const method = req.method ?? "GET";
 
