@@ -1,8 +1,8 @@
-import { BOARD, BOARD_SPACE_COUNT } from "./board";
-import { GAME_RULES } from "./rules";
-import { drawCard, type CardEffect } from "./cards";
-import { countRailroads, createPropertyLedger, getBaseRent, getLegalPropertyActions, isPurchasable, type PropertyAction } from "./properties";
-import type { Controller, GameEvent, GameState, NewGameOptions, Player, PlayerRole } from "./types";
+import { BOARD, BOARD_SPACE_COUNT } from "./board.js";
+import { GAME_RULES } from "./rules.js";
+import { drawCard, type CardEffect } from "./cards.js";
+import { countRailroads, createPropertyLedger, getBaseRent, getLegalPropertyActions, isPurchasable, type PropertyAction } from "./properties.js";
+import type { Controller, GameEvent, GameState, NewGameOptions, Player, PlayerRole } from "./types.js";
 
 const defaultRandom = () => Math.random();
 function addEvent(state: GameState, message: string, kind: GameEvent["kind"] = "system"): GameState {
