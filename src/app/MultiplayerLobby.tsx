@@ -33,6 +33,12 @@ export function MultiplayerLobby({ onBack }: { onBack: () => void }) {
   const [activeEvent, setActiveEvent] = useState<GameState["events"][number] | null>(null);
   const lastSeenEventId = useRef<number | null>(null);
 
+  useEffect(() => {
+    const syncFullscreen = () => setIsFullscreen(Boolean(document.fullscreenElement));
+    document.addEventListener("fullscreenchange", syncFullscreen);
+    return () => document.removeEventListener("fullscreenchange", syncFullscreen);
+  }, []);
+
   const saveCredentials = useCallback((value: Credentials | null) => {
     setCredentials(value);
     if (value) localStorage.setItem(storageKey, JSON.stringify(value));
