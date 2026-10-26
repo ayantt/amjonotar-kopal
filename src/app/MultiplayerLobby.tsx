@@ -198,16 +198,17 @@ export function MultiplayerLobby({ onBack }: { onBack: () => void }) {
 
   return <main className="app-shell multiplayer-shell">
     <header className="masthead"><span className="seal">আ</span><span>PiStack POLITICS CLUB</span><button className="secondary-action" onClick={onBack}>SINGLE PLAYER ↗</button></header>
-    <section className="hero multiplayer-hero">
+    {!room?.state && <section className="hero multiplayer-hero">
       <p className="eyebrow">ONLINE MODE · ROOM-CODE MULTIPLAYER</p>
       <h1>Play<br/><em>together.</em></h1>
       <p className="intro">Create a private room and invite 1–5 other players. The host can start with 2–6 players. At game start, one player is randomly selected as Politician; everyone else becomes a Citizen.</p>
-    </section>
+    </section>}
     {!credentials ? <section className="multiplayer-panel">
       <label className="multiplayer-label">YOUR DISPLAY NAME<input value={name} maxLength={24} onChange={(e) => setName(e.target.value)} placeholder="Enter a name" /></label>
       <div className="multiplayer-actions"><button className="primary-action" disabled={working || !isOnline || !name.trim()} onClick={() => void createRoom()}>{working ? "PLEASE WAIT…" : "CREATE A ROOM"}</button></div>
       <div className="multiplayer-join"><label className="multiplayer-label">ROOM CODE<input value={joinCode} maxLength={6} autoCapitalize="characters" onChange={(e) => setJoinCode(e.target.value.toUpperCase().replace(/[^A-HJ-NP-Z2-9]/g, ""))} placeholder="ABC234" /></label><button className="secondary-action" disabled={working || !isOnline || !name.trim() || joinCode.length !== 6} onClick={() => void joinRoom()}>JOIN ROOM ↗</button></div>
     </section> : room ? <section className="multiplayer-panel">
+      {room.status === "waiting" && <>
       <div className="multiplayer-room-heading"><div><span className="eyebrow">ROOM CODE</span><h2>{room.code}</h2></div><button className="secondary-action" onClick={() => void navigator.clipboard?.writeText(room.code)}>COPY CODE</button></div>
       <p className="multiplayer-notice">{notice}</p>
       {!isOnline && <p className="multiplayer-error" role="status">Connection lost. Actions are paused until this device reconnects.</p>}
@@ -217,6 +218,7 @@ export function MultiplayerLobby({ onBack }: { onBack: () => void }) {
         const seat = room.seats[index];
         return <div className="multiplayer-seat" key={index}><span className="role-number">SEAT 0{index + 1} · {room.status === "waiting" ? "ROLE DRAW AT START" : (seat?.role ?? "PLAYER").toUpperCase()}</span><strong>{seat?.name ?? "Waiting for player…"}</strong><small>{seat ? (seat.playerId === credentials.playerId ? "YOU" : seat.lastSeenAt && Date.now() - new Date(seat.lastSeenAt).getTime() > 15000 ? "DISCONNECTED" : seat.playerId === room.hostPlayerId ? "HOST" : "CONNECTED") : "OPEN SEAT"}</small></div>;
       })}</div>
+      </>}
       {room.status === "waiting" && <div className="multiplayer-actions">{credentials.playerId === room.hostPlayerId ? <button className="primary-action" disabled={working || !isOnline || room.seats.length < 2} onClick={() => void hostStart()}>{room.seats.length >= 2 ? "START GAME" : "WAITING FOR 1 MORE PLAYER"}</button> : <p>Waiting for the host to start with at least 2 players. Keep this page open.</p>}</div>}
       <div className="multiplayer-actions"><button className="secondary-action" onClick={disconnect}>LEAVE THIS DEVICE</button><button className="secondary-action" onClick={() => void refresh()}>REFRESH STATE ↻</button></div>
     </section> : null}
