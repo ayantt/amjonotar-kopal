@@ -1,16 +1,12 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { BOARD } from "../game/board";
-import { getLegalPropertyActions } from "../game/properties";
-import { BoardView } from "./BoardView";
-import { EventLog } from "./EventLog";
-import { PropertyModal } from "./PropertyModal";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { GameState } from "../game/types";
+import { GameScreen, type GameActions } from "./GameScreen";
+import { useEventFeed } from "./useEventFeed";
 
 type PublicSeat = { playerId: string; name: string; role: "politician" | "citizen" | null; joinedAt: string; lastSeenAt?: string };
 type Room = { code: string; status: "waiting" | "active" | "finished"; version: number; hostPlayerId: string; seats: PublicSeat[]; state: GameState | null; createdAt: string; expiresAt: string };
 type Credentials = { code: string; playerId: string; token: string };
 const storageKey = "amjonotar-kopal-multiplayer-seat";
-const money = (value: number) => `৳${value.toLocaleString("en-BD")}`;
 class MultiplayerRequestError extends Error {
   constructor(message: string, readonly status: number, readonly payload: Record<string, unknown>) { super(message); }
 }
@@ -32,23 +28,14 @@ export function MultiplayerLobby({ onBack }: { onBack: () => void }) {
   const workingRef = useRef(false);
   const [isOnline, setIsOnline] = useState(typeof navigator === "undefined" ? true : navigator.onLine);
   const [notice, setNotice] = useState("Create a room or join friends with a room code.");
-  const [selectedPropertyId, setSelectedPropertyId] = useState<string | null>(null);
-  const [isFullscreen, setIsFullscreen] = useState(false);
-  const [showEventPopups, setShowEventPopups] = useState(true);
-  const [activeEvent, setActiveEvent] = useState<GameState["events"][number] | null>(null);
-  const lastSeenEventId = useRef<number | null>(null);
+  const [soundEnabled, setSoundEnabled] = useState(true);
+  const feed = useEventFeed(room?.state?.events ?? [], soundEnabled, room?.code ?? null);
 
   useEffect(() => {
     const syncOnline = () => setIsOnline(navigator.onLine);
     window.addEventListener("online", syncOnline);
     window.addEventListener("offline", syncOnline);
     return () => { window.removeEventListener("online", syncOnline); window.removeEventListener("offline", syncOnline); };
-  }, []);
-
-  useEffect(() => {
-    const syncFullscreen = () => setIsFullscreen(Boolean(document.fullscreenElement));
-    document.addEventListener("fullscreenchange", syncFullscreen);
-    return () => document.removeEventListener("fullscreenchange", syncFullscreen);
   }, []);
 
   const saveCredentials = useCallback((value: Credentials | null) => {
@@ -92,40 +79,8 @@ export function MultiplayerLobby({ onBack }: { onBack: () => void }) {
     return () => window.clearInterval(timer);
   }, [credentials, refresh, working, isOnline]);
 
-  useEffect(() => {
-    const events = room?.state?.events ?? [];
-    if (events.length === 0) return;
-    const latest = events[events.length - 1];
-    if (lastSeenEventId.current === null) {
-      lastSeenEventId.current = latest.id;
-      return;
-    }
-    if (latest.id <= lastSeenEventId.current) return;
-    lastSeenEventId.current = latest.id;
-    if (!showEventPopups) return;
-    setActiveEvent(latest);
-  }, [room?.state?.events, showEventPopups]);
-
-  useEffect(() => {
-    if (!activeEvent || !showEventPopups) return;
-    const eventId = activeEvent.id;
-    const timer = window.setTimeout(() => setActiveEvent((active) => active?.id === eventId ? null : active), 2600);
-    return () => window.clearTimeout(timer);
-  }, [activeEvent, showEventPopups]);
-
   const current = room?.state?.players[room.state.currentPlayerIndex];
   const isMyTurn = Boolean(current && credentials && current.id === credentials.playerId && room?.status === "active");
-  const legalActions = useMemo(() => room?.state && current ? getLegalPropertyActions(room.state, current) : [], [room?.state, current]);
-  const pendingSpace = room?.state?.pendingPropertyId ? BOARD.find((space) => space.id === room?.state?.pendingPropertyId) : undefined;
-  const selectedSpace = selectedPropertyId ? BOARD.find((space) => space.id === selectedPropertyId) : undefined;
-  const selectedProperty = selectedSpace && room?.state ? room.state.properties[selectedSpace.id] : undefined;
-  const selectedColorGroup = selectedSpace?.color ? BOARD.filter((space) => space.type === "property" && space.color === selectedSpace.color) : [];
-  const selectedDevelopmentLevel = selectedProperty?.hotel ? 4 : selectedProperty?.houses ?? 0;
-  const citizenCanBuildSelected = Boolean(current && room?.state && (current.role === "politician" || (selectedColorGroup.length > 0 && selectedColorGroup.every((space) => {
-    const property = room.state!.properties[space.id];
-    const level = property?.hotel ? 4 : property?.houses ?? 0;
-    return property?.ownerId === current.id && !property.mortgaged && !property.leaseholderId && !room.state!.cooperativePropertyIds.includes(space.id) && level >= selectedDevelopmentLevel;
-  }))));
 
   async function createRoom() {
     if (workingRef.current || !isOnline) return;
@@ -204,6 +159,43 @@ export function MultiplayerLobby({ onBack }: { onBack: () => void }) {
     saveCredentials(null); setRoom(null); setError(""); setNotice("Create a room or join friends with a room code.");
   }
 
+  if (credentials && room?.state && current) {
+    const staleSeats = room.seats.some((seat) => seat.lastSeenAt && Date.now() - new Date(seat.lastSeenAt).getTime() > 15000);
+    const actions: GameActions = {
+      roll: () => void submitAction({ type: "roll" }),
+      endTurn: () => void submitAction({ type: "end-turn" }),
+      propertyAction: (action) => void submitAction({ type: "property", action }),
+      buyCooperative: () => void submitAction({ type: "buy-cooperative-property" }),
+      contribute: (amount) => void submitAction({ type: "contribute", amount }),
+      build: (spaceId, building) => void submitAction({ type: "build", spaceId, building }),
+      mortgage: (spaceId) => void submitAction({ type: "mortgage", spaceId }),
+      redeem: (spaceId) => void submitAction({ type: "redeem-mortgage", spaceId }),
+      sell: (spaceId) => void submitAction({ type: "sell-property", spaceId }),
+    };
+    return <GameScreen
+      game={room.state}
+      viewerId={credentials.playerId}
+      online
+      wordmarkNote={`ONLINE REPUBLIC · ROOM ${room.code}`}
+      turnLabel={room.status === "finished" ? "GAME OVER" : isMyTurn ? "YOUR TURN" : `${current.name.toUpperCase()}'S TURN`}
+      statusMessage={working ? "Synchronizing with the room…" : isMyTurn ? "Your seat is active. Actions are validated by the game server." : `Waiting for ${current.name} to complete their turn.`}
+      canAct={isMyTurn && room.state.phase !== "game-over"}
+      busy={working || !isOnline}
+      waitingNote="Waiting for the active player. This board updates automatically."
+      soundEnabled={soundEnabled}
+      onToggleSound={() => setSoundEnabled((enabled) => !enabled)}
+      feed={feed}
+      actions={actions}
+      headerActions={<><button className="reset-button" onClick={() => void refresh()}>SYNC ↻</button><button className="reset-button" onClick={() => { if (room.status !== "active" || window.confirm("Leaving this device gives up your seat on it. Leave anyway?")) void disconnect(); }}>LEAVE ↗</button></>}
+      banner={(!isOnline || error || staleSeats) ? <div className="game-banner">
+        {!isOnline && <p className="multiplayer-error" role="status">Connection lost. Actions are paused until this device reconnects.</p>}
+        {staleSeats && <p className="multiplayer-error" role="status">One or more players appear disconnected. Their seat is preserved; reconnecting restores their session.</p>}
+        {error && <p className="multiplayer-error" role="alert">{error}</p>}
+      </div> : undefined}
+      footerAction={<span>ROOMS EXPIRE AFTER 12 HOURS · SERVER-VALIDATED TURNS</span>}
+    />;
+  }
+
   return <main className="app-shell multiplayer-shell">
     <header className="masthead"><span className="seal">আ</span><span>PiStack POLITICS CLUB</span><button className="secondary-action" onClick={onBack}>SINGLE PLAYER ↗</button></header>
     {!room?.state && <section className="hero multiplayer-hero">
@@ -228,40 +220,6 @@ export function MultiplayerLobby({ onBack }: { onBack: () => void }) {
       })}</div>
       </>}
       {room.status === "waiting" && <div className="multiplayer-actions">{credentials.playerId === room.hostPlayerId ? <button className="primary-action" disabled={working || !isOnline || room.seats.length < 2} onClick={() => void hostStart()}>{room.seats.length >= 2 ? "START GAME" : "WAITING FOR 1 MORE PLAYER"}</button> : <p>Waiting for the host to start with at least 2 players. Keep this page open.</p>}</div>}
-      {room.state && current && <div className="multiplayer-game game-shell multiplayer-board-shell">
-        <div className="game-header multiplayer-active-header">
-          <div className="wordmark">আমজনতার কপাল<span>THE PEOPLE PAY. THE POWERFUL PLAY.</span></div>
-          <div className="turn-pill"><span className={isMyTurn ? "pulse-dot" : "pulse-dot ai-dot"} />{room.status === "finished" ? "GAME OVER" : isMyTurn ? "YOUR TURN" : `${current.name.toUpperCase()}'S TURN`} · ROUND {room.state.round}</div>
-          <div className="header-actions"><button className="reset-button" onClick={() => void refresh()}>SYNC ↻</button></div>
-        </div>
-        {room.state.phase === "game-over" && <section className="game-over-panel"><strong>GAME OVER</strong><p>{[...room.state.events].reverse().find((event) => /wins|win\\b/i.test(event.message))?.message ?? (room.state.winner ? `${room.state.players.find((p) => p.id === room.state?.winner)?.name ?? "A player"} wins as the last player standing.` : "Game over.")}</p></section>}
-        <section className="game-intro"><div><p className="eyebrow">THE PEOPLE PAY. THE POWERFUL PLAY.</p><h1>The board is <em>rigged.</em></h1></div><p>{working ? "Synchronizing with the room…" : isMyTurn ? "Your seat is active. Actions are validated by the game server." : `Waiting for ${current.name} to complete their turn.`}</p></section>
-        <section className="game-layout">
-          <EventLog events={room.state.events} popupsEnabled={showEventPopups} onTogglePopups={() => { setShowEventPopups((enabled) => !enabled); setActiveEvent(null); }} />
-          <BoardView game={room.state} current={current} localPlayerId={credentials.playerId} isFullscreen={isFullscreen} showEventPopup={showEventPopups} activeEvent={activeEvent} onSelectProperty={setSelectedPropertyId} onToggleFullscreen={async () => {
-            try {
-              if (document.fullscreenElement) await document.exitFullscreen();
-              else await document.querySelector(".multiplayer-board-shell")?.requestFullscreen?.();
-            } catch { setError("Fullscreen is not available in this browser."); }
-          }} onDismissEvent={() => setActiveEvent(null)} />
-          <aside className="sidebar">
-            <section className="panel current-panel"><div className="panel-label">NOW PLAYING</div>
-              <div className="current-player"><span className={`large-token ${current.role} player-color-player-${room.state.players.findIndex((player) => player.id === current.id) + 1}`}>{current.role === "politician" ? "P" : current.name.slice(0,1)}</span><div><h2>{current.name}</h2><p>{current.role === "politician" ? "Politician" : "Citizen"} · {current.id === credentials.playerId ? "Your seat" : "Online player"}</p></div></div>
-              <div className="cash-line"><span>AVAILABLE CASH</span><strong>{money(current.cash)}</strong></div>
-              {isMyTurn && room.state.phase === "awaiting-roll" && <button className="primary-action" disabled={working} onClick={() => void submitAction({ type: "roll" })}>ROLL {current.role === "politician" ? "TWO DICE" : "ONE DIE"} <span>↗</span></button>}
-              {isMyTurn && room.state.pendingPropertyId && <div className="property-decision"><div className="panel-label">PROPERTY DECISION</div><strong>{pendingSpace?.name ?? room.state.pendingPropertyId}</strong><p>Choose what to do with this unclaimed space.</p>{legalActions.map((action) => <button className={action.type === "decline" ? "secondary-action" : "primary-action"} key={action.type} disabled={working} onClick={() => void submitAction({ type: "property", action: action.type })}>{action.label}<span>{action.type === "decline" ? "↷" : money(action.cost)}</span></button>)}{current.role === "citizen" && room.state.cooperativeFund >= (pendingSpace?.price ?? Infinity) && <button className="secondary-action" disabled={working} onClick={() => void submitAction({ type: "buy-cooperative-property" })}>BUY FOR CITIZENS' CO-OP <span>{money(pendingSpace?.price ?? 0)}</span></button>}</div>}
-              {isMyTurn && room.state.phase === "awaiting-end-turn" && !room.state.pendingPropertyId && <button className="primary-action" disabled={working} onClick={() => void submitAction({ type: "end-turn" })}>{room.state.extraRollAvailable ? "TAKE EXTRA ROLL" : "END TURN →"}</button>}
-              {!isMyTurn && room.state.phase !== "game-over" && <p className="ai-note">Waiting for the active player. This board updates automatically.</p>}
-            </section>
-            <section className="panel players-panel"><div className="panel-label">PLAYERS IN THIS ROOM</div>{room.state.players.map((player, seatIndex) => <div className={`player-row ${player.id === current.id ? "selected" : ""}`} key={player.id}><span className={`mini-token ${player.role} player-color-player-${seatIndex + 1}`}>{player.role === "politician" ? "P" : player.name.slice(0,1)}</span><div className="player-row-name"><strong>{player.name}</strong><small>{player.role.toUpperCase()} · {player.id === credentials.playerId ? "YOU" : "ONLINE"}{player.bankrupt ? " · BANKRUPT" : ""}</small></div><strong className="player-cash">{money(player.cash)}</strong><small className="position-label">#{player.position}</small></div>)}</section>
-            <section className="panel funds-panel"><div className="panel-label">THE COMMON POOL</div><div className="fund-row"><span>Public treasury</span><strong>{money(room.state.publicFund)}</strong></div><div className="fund-row"><span>Citizens' cooperative</span><strong>{money(room.state.cooperativeFund)}</strong></div>
-              {isMyTurn && current.role === "citizen" && <div className="cooperative-actions"><div className="panel-label">ORGANIZE TOGETHER</div><div className="cooperative-buttons"><button className="secondary-action" disabled={working || current.cash < 100} onClick={() => void submitAction({ type: "contribute", amount: 100 })}>CONTRIBUTE ৳100</button><button className="secondary-action" disabled={working || current.cash < 500} onClick={() => void submitAction({ type: "contribute", amount: 500 })}>CONTRIBUTE ৳500</button></div></div>}
-              <div className="fund-row"><span>Community cards drawn</span><strong>{room.state.cardDrawCounts.community}/16</strong></div><div className="fund-row"><span>Chance cards drawn</span><strong>{room.state.cardDrawCounts.chance}/16</strong></div>
-            </section>
-          </aside>
-        </section>
-        {selectedSpace && <PropertyModal game={room.state} current={current} selectedSpace={selectedSpace} isCurrentPlayerTurn={isMyTurn} citizenCanBuildSelected={citizenCanBuildSelected} onClose={() => setSelectedPropertyId(null)} onBuild={(spaceId, building) => void submitAction({ type: "build", spaceId, building })} onMortgage={(spaceId) => void submitAction({ type: "mortgage", spaceId })} onRedeem={(spaceId) => void submitAction({ type: "redeem-mortgage", spaceId })} onSell={(spaceId) => void submitAction({ type: "sell-property", spaceId })} />}
-      </div>}
       <div className="multiplayer-actions"><button className="secondary-action" onClick={disconnect}>LEAVE THIS DEVICE</button><button className="secondary-action" onClick={() => void refresh()}>REFRESH STATE ↻</button></div>
     </section> : null}
     {error && <p className="multiplayer-error" role="alert">{error}</p>}
