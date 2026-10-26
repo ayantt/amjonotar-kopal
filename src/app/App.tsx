@@ -1,11 +1,13 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { BOARD } from "../game/board";
 import { buildProperty, buyCooperativeProperty, contributeToCooperative, createNewGame, endTurn, getCurrentPlayer, isHumanTurn, mortgageProperty, redeemMortgage, resolvePropertyAction, rollAndMove, sellProperty, validateSetup } from "../game/engine";
 import { runAiTurn } from "../game/turns";
 import type { GameState, PlayerRole } from "../game/types";
+import { AnalyticsDashboard } from "./AnalyticsDashboard";
 import { GameScreen, type GameActions } from "./GameScreen";
 import { MultiplayerLobby } from "./MultiplayerLobby";
 import { playSound } from "./sound";
+import { newGameId, trackGameFinish, trackGameProgress, trackGameStart } from "./telemetry";
 import { useEventFeed } from "./useEventFeed";
 
 const roleName = (role: PlayerRole) => role === "politician" ? "Politician" : "Citizen";
@@ -13,7 +15,14 @@ const roleName = (role: PlayerRole) => role === "politician" ? "Politician" : "C
 export function App() {
   const [game, setGame] = useState<GameState | null>(null);
   const [gameNumber, setGameNumber] = useState(0);
+  const gameId = useRef<string | null>(null);
+  useEffect(() => {
+    const syncRoute = () => setShowAnalytics(window.location.hash === "#/analytics");
+    window.addEventListener("hashchange", syncRoute);
+    return () => window.removeEventListener("hashchange", syncRoute);
+  }, []);
   const [showMultiplayer, setShowMultiplayer] = useState(false);
+  const [showAnalytics, setShowAnalytics] = useState(() => window.location.hash === "#/analytics");
   const [busy, setBusy] = useState(false);
   const [soundEnabled, setSoundEnabled] = useState(true);
   const [lastAction, setLastAction] = useState("Choose your role to start a new game.");
@@ -40,8 +49,21 @@ export function App() {
     return () => window.clearTimeout(timer);
   }, [game, feed.isPlaying]);
 
+  const round = game?.round ?? 0;
+  const lastProgressRound = useRef(0);
+  useEffect(() => {
+    // Report progress every 5 rounds (not every action) so abandoned games show where players stopped.
+    if (!gameId.current || round < 5 || round % 5 !== 0 || round <= lastProgressRound.current) return;
+    lastProgressRound.current = round;
+    trackGameProgress(gameId.current, round);
+  }, [round]);
+
   const victory = game?.phase === "game-over";
   useEffect(() => {
+    if (victory && game && gameId.current) {
+      trackGameFinish(gameId.current, game);
+      gameId.current = null;
+    }
     if (victory) playSound("victory", soundEnabled);
     // Only the transition into game-over should chime, not later sound toggles.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -52,6 +74,9 @@ export function App() {
     if (!validateSetup(next)) throw new Error("Invalid four-player setup.");
     setGame(next);
     setGameNumber((n) => n + 1);
+    gameId.current = newGameId();
+    lastProgressRound.current = 0;
+    trackGameStart(gameId.current, role);
     playSound("start", soundEnabled);
     setBusy(false);
     setLastAction(`Game started. You are the ${roleName(role)}.`);
@@ -102,6 +127,7 @@ export function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }), [game, soundEnabled]);
 
+  if (showAnalytics) return <AnalyticsDashboard onBack={() => { window.location.hash = ""; setShowAnalytics(false); }} />;
   if (!game && showMultiplayer) return <MultiplayerLobby onBack={() => setShowMultiplayer(false)} />;
 
   if (!game) return <main className="app-shell">
@@ -117,7 +143,7 @@ export function App() {
       </div>
       <button className="multiplayer-entry" onClick={() => setShowMultiplayer(true)}><span><strong>PLAY WITH FRIENDS</strong><small>Online multiplayer · room code · four human players</small></span><b>CREATE / JOIN ROOM ↗</b></button>
     </section>
-    <footer className="site-footer"><span>FICTIONAL POLITICAL SATIRE</span><span>4 SEATS · SINGLE-PLAYER OR ONLINE</span></footer>
+    <footer className="site-footer"><span>FICTIONAL POLITICAL SATIRE</span><span>4 SEATS · SINGLE-PLAYER OR ONLINE</span><span className="privacy-note">ANONYMOUS GAME STATS ONLY · NO NAMES, NO TRACKING IDS · DO NOT TRACK HONOURED</span></footer>
   </main>;
 
   const current = getCurrentPlayer(game);

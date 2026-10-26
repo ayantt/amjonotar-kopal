@@ -1,7 +1,7 @@
 # Architecture
 
 ## Stack and boundaries
-React + TypeScript + Vite, strict mode, Vitest. Client-only MVP; no backend, DB, auth, analytics, remote AI API, or online multiplayer. Three AI opponents run in the browser. LocalStorage save/load may be added after core gameplay.
+React + TypeScript + Vite, strict mode, Vitest. Client-only MVP; no auth or remote AI API. Online multiplayer and anonymous analytics are optional server features (see MULTIPLAYER_PLAN.md and "Analytics" below); single-player still works fully offline. Three AI opponents run in the browser. LocalStorage save/load may be added after core gameplay.
 
 ```text
 React UI -> turn orchestrator -> pure TypeScript game engine -> board/rules/card data
@@ -17,6 +17,15 @@ The engine and AI must not import React, DOM, localStorage, or networking. Persi
 
 ## Shared game screen
 Single-player (`App.tsx`) and online play (`MultiplayerLobby.tsx`) both render the in-game UI through one component, `GameScreen.tsx`, so the two modes always look and behave the same. `GameScreen` is presentational: it receives the `GameState`, the viewer's seat id, a `GameActions` object and an event feed, and never mutates state. Single-player implements `GameActions` with local engine calls; online play implements them as server requests. `Constitution.tsx`, `BoardView.tsx`, `EventLog.tsx`, `PropertyModal.tsx`, `sound.ts` and `useEventFeed.ts` are shared the same way. Any new in-game UI belongs in `GameScreen`, not in either container.
+
+## Analytics
+- `src/game/stats.ts` — counters the engine records as play happens (optional on `GameState`, so older saved rooms still load).
+- `src/game/analytics.ts` — `summarizeGame` (anonymous per-game summary) and `aggregateSummaries` (win rates with Wilson intervals, length distribution, money flow, bankruptcy causes, space and card stats, wealth curve). Pure; no browser or server imports.
+- `src/game/analyticsValidation.ts` — validates untrusted summaries and rebuilds them from known fields.
+- `src/server/analyticsStore.ts` + `api/analytics.ts` — Postgres table `analytics_games`; `POST /api/analytics/games/start|progress|finish` (single-player only; `progress` sends only the round number every 5 rounds so drop-off can be measured) and `GET /api/analytics/summary` (admin token).
+- `src/app/telemetry.ts` — client reporting; silent on failure, skipped on Do Not Track. `src/app/AnalyticsDashboard.tsx` — admin dashboard at `#/analytics` (players: games, completion, abandonment, session length, office chosen, room sizes, drop-off by round, start hour, daily activity; gameplay: win rates, wealth curve, money flow, bankruptcy causes, property decisions, space profitability and traffic; every chart has a table view; `src/app/analyticsCharts.tsx`). Table `analytics_games` gains `last_round` and `last_seen_at`, added automatically with `ALTER TABLE ... IF NOT EXISTS`. A single-player game with no report for 60 minutes counts as abandoned; an online room counts as abandoned once it would have expired (12 hours).
+- Balance reports: `npm run analytics:report` (`GAMES`, `SEED_BASE` optional) simulates seeded all-AI games and writes `reports/balance-report.{md,json}` (git-ignored). The simulation does not run in `npm test`.
+- Environment: `DATABASE_URL` (shared with multiplayer) and `ANALYTICS_ADMIN_TOKEN` (required to read results; without it the summary endpoint returns 503).
 
 ## Planned layout
 ```text

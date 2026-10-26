@@ -2,6 +2,7 @@ import { BOARD, BOARD_SPACE_COUNT } from "./board.js";
 import { GAME_RULES } from "./rules.js";
 import { drawCard, type CardEffect } from "./cards.js";
 import { countRailroads, createPropertyLedger, getBaseRent, getLegalPropertyActions, isPurchasable, type PropertyAction } from "./properties.js";
+import { recordBankruptcy, recordBuild, recordCard, recordCashSnapshot, recordDecision, recordFlow, recordLanding, recordRent, type PayTag } from "./stats.js";
 import type { Controller, GameEvent, GameState, NewGameOptions, Player, PlayerRole } from "./types.js";
 
 const defaultRandom = () => Math.random();
@@ -26,6 +27,7 @@ export function contributeToCooperative(state: GameState, playerId: string, amou
   if (!Number.isInteger(amount) || amount <= 0 || player.cash < amount) throw new Error("Contribution must be positive and affordable.");
   let next = { ...state, cooperativeFund: state.cooperativeFund + amount,
     players: state.players.map((p) => p.id === playerId ? { ...p, cash: p.cash - amount } : p) };
+  next = recordFlow(next, playerId, "out", "contribution", amount);
   next = addEvent(next, `${player.name} contributed ৳${amount} to the Citizens' cooperative fund.`, "money");
   return checkVictory(next);
 }
@@ -42,7 +44,7 @@ export function buyCooperativeProperty(state: GameState, playerId: string): Game
 }
 function initializeGame(players: Player[], startMessage: string): GameState {
   const initial: GameState = { schemaVersion: 1, phase: "awaiting-roll", players, currentPlayerIndex: 0, publicFund: 0, cooperativeFund: 0, properties: createPropertyLedger(), cooperativePropertyIds: [], pendingPropertyId: null, cardDrawCounts: { community: 0, chance: 0 }, extraRollAvailable: false, events: [], nextEventId: 1, round: 1, winner: null };
-  const state = addEvent(initial, startMessage);
+  const state = addEvent(recordCashSnapshot(initial), startMessage);
   return addEvent(state, `The board has ${BOARD_SPACE_COUNT} spaces. All players begin at Shurur Line.`);
 }
 export function createNewGame({ humanRole }: NewGameOptions): GameState {
@@ -75,7 +77,7 @@ export function rollDice(count: number, random: () => number = defaultRandom): n
 }
 export function getDiceCount(player: Player): number { return player.role === "politician" ? GAME_RULES.politicianDiceCount : GAME_RULES.citizenDiceCount; }
 /** Moves money from a player to another player, the public treasury, or (toCooperative) the cooperative fund. */
-function pay(state: GameState, payerId: string, recipientId: string | null, amount: number, reason: string, toCooperative = false): GameState {
+function pay(state: GameState, payerId: string, recipientId: string | null, amount: number, reason: string, toCooperative = false, tag: PayTag = { category: "other" }): GameState {
   if (amount <= 0 || state.phase === "game-over") return state;
   const payer = state.players.find((p) => p.id === payerId);
   if (!payer || payer.bankrupt) return state;
@@ -99,6 +101,7 @@ function pay(state: GameState, payerId: string, recipientId: string | null, amou
         players: next.players.map((p) => p.id === payerId ? { ...p, cash: p.cash + proceeds } : p),
         publicFund: next.publicFund + fee };
       next = addEvent(next, `${payer.name} mortgaged ${space?.name ?? asset.spaceId}: received ৳${proceeds}${fee ? ` after a ৳${fee} processing fee` : ""} to cover ${reason}.`, "money");
+      next = recordFlow(next, payerId, "in", "mortgage", proceeds);
       const paidFromMortgage = Math.min(proceeds, remaining);
       next = { ...next, players: next.players.map((p) => p.id === payerId ? { ...p, cash: p.cash - paidFromMortgage } : p) };
       remaining -= paidFromMortgage;
@@ -108,6 +111,9 @@ function pay(state: GameState, payerId: string, recipientId: string | null, amou
   if (recipientId) next = { ...next, players: next.players.map((p) => p.id === recipientId ? { ...p, cash: p.cash + paid } : p) };
   else if (toCooperative) next = { ...next, cooperativeFund: next.cooperativeFund + paid };
   else next = { ...next, publicFund: next.publicFund + paid };
+  next = recordFlow(next, payerId, "out", tag.category, paid);
+  if (recipientId) next = recordFlow(next, recipientId, "in", tag.category, paid);
+  if (tag.spaceId && (tag.category === "rent" || tag.category === "coop-rent" || tag.category === "service-charge")) next = recordRent(next, tag.spaceId, paid);
   next = addEvent(next, `${payer.name} paid ৳${paid} of ৳${amount} for ${reason}.`, "money");
   if (remaining > 0) {
     // Heir of a bankrupt player's property: a solvent Politician inherits from a Citizen; otherwise the solvent
@@ -119,6 +125,7 @@ function pay(state: GameState, payerId: string, recipientId: string | null, amou
       properties: Object.fromEntries(Object.entries(next.properties).map(([id, property]) => property.ownerId === payerId
         ? [id, { ...property, ownerId: heirId, leaseholderId: null, leaseExpiresAtGoPass: null, mortgaged: false, ...(heirId ? {} : { houses: 0, hotel: false }) }]
         : property.leaseholderId === payerId ? [id, { ...property, leaseholderId: null, leaseExpiresAtGoPass: null }] : [id, property])) };
+    next = recordBankruptcy(next, payerId, tag.category);
     next = addEvent(next, `${payer.name} could not pay the remaining ৳${remaining} and went bankrupt. Assets were transferred under the current bankruptcy rule.`);
     next = checkVictory(next);
   }
@@ -138,7 +145,7 @@ function resolveOwnedSpace(state: GameState, player: Player, spaceId: string): G
     if (space?.type === "railroad") rent = 50 * Math.max(1, state.cooperativePropertyIds.filter((id) => BOARD.find((s) => s.id === id)?.type === "railroad").length);
     if (space?.type === "utility") rent = Math.max(1, player.lastRoll.reduce((sum, n) => sum + n, 0)) * 4;
     if (player.role === "politician") rent = Math.ceil(rent / GAME_RULES.politicianVisitorRentDivisor);
-    return pay(state, player.id, null, rent, (space?.name ?? spaceId) + " cooperative rent", true);
+    return pay(state, player.id, null, rent, (space?.name ?? spaceId) + " cooperative rent", true, { category: "coop-rent", spaceId });
   }
   const property = state.properties[spaceId];
   const space = BOARD.find((s) => s.id === spaceId);
@@ -154,7 +161,7 @@ function resolveOwnedSpace(state: GameState, player: Player, spaceId: string): G
     }
     const diceTotal = Math.max(1, player.lastRoll.reduce((sum, n) => sum + n, 0));
     const amount = controller.role === "politician" ? diceTotal * GAME_RULES.politicianUtilityMultiplier + GAME_RULES.politicianUtilityFlat : diceTotal * 4;
-    return pay(state, player.id, controllerId, amount, `${space.name} service charge`);
+    return pay(state, player.id, controllerId, amount, `${space.name} service charge`, false, { category: "service-charge", spaceId: space.id });
   }
   let rent = getBaseRent(spaceId);
   if (space.type === "railroad") {
@@ -168,7 +175,7 @@ function resolveOwnedSpace(state: GameState, player: Player, spaceId: string): G
     rent *= multiplier;
     if (player.role === "politician" && controller.role === "citizen") rent = Math.ceil(rent / GAME_RULES.politicianVisitorRentDivisor);
   }
-  return pay(state, player.id, controllerId, rent, `${space.name} rent`);
+  return pay(state, player.id, controllerId, rent, `${space.name} rent`, false, { category: "rent", spaceId: space.id });
 }
 function applyCardEffect(state: GameState, playerId: string, effect: CardEffect, depth: number): GameState {
   let next = state;
@@ -178,11 +185,12 @@ function applyCardEffect(state: GameState, playerId: string, effect: CardEffect,
     if (effect.recipient === "bank") {
       if (effect.amount >= 0) {
         next = { ...next, players: next.players.map((p) => p.id === playerId ? { ...p, cash: p.cash + effect.amount } : p) };
+        next = recordFlow(next, playerId, "in", "card", effect.amount);
         return addEvent(next, `${player.name} received ৳${effect.amount} from ${effect.amount === 0 ? "the card" : "the public system"}.`, "money");
       }
-      return pay(next, playerId, null, -effect.amount, "card expense");
+      return pay(next, playerId, null, -effect.amount, "card expense", false, { category: "card" });
     }
-    if (effect.recipient === "public") return pay(next, playerId, null, effect.amount, "card payment to public fund");
+    if (effect.recipient === "public") return pay(next, playerId, null, effect.amount, "card payment to public fund", false, { category: "card" });
     if (effect.recipient === "cooperative") {
       if (effect.amount >= 0) return addEvent({ ...next, cooperativeFund: next.cooperativeFund + effect.amount }, `${player.name} received a cooperative distribution of ৳${effect.amount}.`, "money");
       return applyCardEffect(next, playerId, { kind: "contribute", amount: -effect.amount, destination: "cooperative", optional: false }, depth);
@@ -190,14 +198,15 @@ function applyCardEffect(state: GameState, playerId: string, effect: CardEffect,
     if (effect.recipient === "public-if-available") {
       const amount = Math.min(next.publicFund, effect.amount);
       next = { ...next, publicFund: next.publicFund - amount, players: next.players.map((p) => p.id === playerId ? { ...p, cash: p.cash + amount } : p) };
+      next = recordFlow(next, playerId, "in", "card", amount);
       return addEvent(next, `${player.name} collected ৳${amount} from the public fund; any unavailable balance was waived.`, "money");
     }
     if (effect.recipient === "public-payment-if-available") {
       if (next.publicFund < effect.amount) return addEvent(next, `${player.name} had no payment due because the public-fund condition was not met; no liability was carried forward.`);
-      return pay(next, playerId, null, effect.amount, "card payment to public fund");
+      return pay(next, playerId, null, effect.amount, "card payment to public fund", false, { category: "card" });
     }
     for (const citizen of next.players.filter((p) => p.role === "citizen" && p.active && p.id !== playerId)) {
-      next = pay(next, citizen.id, playerId, effect.amount, "card collection");
+      next = pay(next, citizen.id, playerId, effect.amount, "card collection", false, { category: "card" });
     }
     return next;
   }
@@ -212,12 +221,14 @@ function applyCardEffect(state: GameState, playerId: string, effect: CardEffect,
     next = { ...next, players: next.players.map((p) => p.id === playerId ? { ...p, cash: p.cash - effect.amount } : p),
       publicFund: effect.destination === "public" ? next.publicFund + effect.amount : next.publicFund,
       cooperativeFund: effect.destination === "cooperative" ? next.cooperativeFund + effect.amount : next.cooperativeFund };
+    next = recordFlow(next, playerId, "out", "contribution", effect.amount);
     return addEvent(next, `${player.name} contributed ৳${effect.amount} to the ${effect.destination === "public" ? "public fund" : "Citizens' cooperative fund"}.`, "money");
   }
   if (effect.kind === "collect-if-citizen-contributes") {
     const other = next.players.find((p) => p.role === "citizen" && p.id !== playerId && p.active && p.cash >= effect.contribution);
     if (!other) return addEvent(next, `${player.name} received no neighbour contribution; no payment was made.`);
     next = { ...next, players: next.players.map((p) => p.id === other.id ? { ...p, cash: p.cash - effect.contribution } : p).map((p) => p.id === playerId ? { ...p, cash: p.cash + effect.amount } : p) };
+    next = recordFlow(recordFlow(next, other.id, "out", "card", effect.contribution), playerId, "in", "card", effect.amount);
     return addEvent(next, `${other.name} contributed ৳${effect.contribution}; ${player.name} received ৳${effect.amount}.`, "money");
   }
   if (effect.kind === "skip-turn") {
@@ -240,7 +251,7 @@ function applyCardEffect(state: GameState, playerId: string, effect: CardEffect,
     const reward = player.role === "politician" ? GAME_RULES.politicianGoReward : GAME_RULES.citizenGoReward;
     next = { ...next, players: next.players.map((p) => p.id === playerId ? { ...p, position: wrapped, cash: p.cash + crossed * reward, goPasses: p.goPasses + crossed } : p) };
     next = addEvent(next, `${player.name} moved ${effect.steps > 0 ? "forward" : "back"} to ${BOARD[wrapped].name} because of a card.`, "movement");
-    if (crossed > 0) next = addEvent(next, `${player.name} collected ৳${crossed * reward} for passing Shurur Line.`, "money");
+    if (crossed > 0) next = recordFlow(addEvent(next, `${player.name} collected ৳${crossed * reward} for passing Shurur Line.`, "money"), playerId, "in", "go", crossed * reward);
     if (effect.resolveDestination && depth < 2) next = resolveLanding(next, playerId, depth + 1);
     return next;
   }
@@ -253,6 +264,7 @@ function resolveCard(state: GameState, playerId: string, deck: "community" | "ch
   const index = state.cardDrawCounts[deck];
   const card = drawCard(deck, index);
   let next: GameState = { ...state, cardDrawCounts: { ...state.cardDrawCounts, [deck]: index + 1 } };
+  next = recordCard(next, card.id, player.role);
   next = addEvent(next, `${player.name} drew ${card.id}: ${card.title}.`);
   for (const effect of card.effects[player.role]) {
     next = applyCardEffect(next, playerId, effect, depth);
@@ -264,7 +276,7 @@ function resolveLanding(state: GameState, playerId: string, depth = 0): GameStat
   const player = state.players.find((p) => p.id === playerId);
   if (!player) return state;
   const space = BOARD[player.position];
-  let next = state;
+  let next = recordLanding(state, space.id);
   if (isPurchasable(space.id)) {
     const property = next.properties[space.id];
     if (next.cooperativePropertyIds.includes(space.id) || property?.ownerId || property?.leaseholderId) return resolveOwnedSpace(next, player, space.id);
@@ -276,13 +288,14 @@ function resolveLanding(state: GameState, playerId: string, depth = 0): GameStat
     const baseAmount = space.id === "luxury-tax" ? (politician ? GAME_RULES.luxuryTaxPolitician : GAME_RULES.luxuryTaxCitizen) : (politician ? GAME_RULES.incomeTaxPolitician : GAME_RULES.incomeTaxCitizen);
     const amount = getEscalatedTax(baseAmount, next.round);
     if (player.role === "politician" && amount === 0) return addEvent(next, `${player.name} invoked a tax exemption at ${space.name}.`);
-    return pay(next, player.id, null, amount, space.name);
+    return pay(next, player.id, null, amount, space.name, false, { category: "tax", spaceId: space.id });
   }
   if (space.type === "free-parking") {
     const sharePercent = player.role === "politician" ? 100 : GAME_RULES.plazaCitizenSharePercent;
     const amount = Math.floor((next.publicFund * sharePercent) / 100);
     if (amount > 0) {
       next = { ...next, publicFund: next.publicFund - amount, players: next.players.map((p) => p.id === player.id ? { ...p, cash: p.cash + amount } : p) };
+      next = recordFlow(next, player.id, "in", "plaza", amount);
       return addEvent(next, `${player.name} withdrew ৳${amount} from the public treasury at Public Plaza.`, "money");
     }
     return addEvent(next, `${player.name} stopped at Public Plaza. No payout was available.`);
@@ -311,6 +324,7 @@ export function movePlayer(state: GameState, playerId: string, steps: number): G
   const cashReward = crossedGoCount * reward + (exactGo ? exactBonus : 0);
   let next: GameState = { ...state, phase: "awaiting-end-turn", pendingPropertyId: null,
     players: state.players.map((candidate, i) => i === index ? { ...candidate, position: newPosition, cash: candidate.cash + cashReward, goPasses: candidate.goPasses + crossedGoCount } : candidate) };
+  next = recordFlow(next, playerId, "in", "go", cashReward);
   if (crossedGoCount > 0) {
     const updatedPlayer = next.players[index];
     const expired = Object.values(next.properties).filter((property) => property.leaseholderId === player.id && property.leaseExpiresAtGoPass !== null && updatedPlayer.goPasses >= property.leaseExpiresAtGoPass);
@@ -327,7 +341,7 @@ export function movePlayer(state: GameState, playerId: string, steps: number): G
     for (const property of developed) {
       const space = BOARD.find((item) => item.id === property.spaceId);
       const maintenance = ((property.houses ?? 0) * 50 + (property.hotel ? 200 : 0)) * crossedGoCount;
-      if (maintenance > 0) next = pay(next, player.id, null, maintenance, (space?.name ?? property.spaceId) + " building maintenance");
+      if (maintenance > 0) next = pay(next, player.id, null, maintenance, (space?.name ?? property.spaceId) + " building maintenance", false, { category: "maintenance" });
     }
     if (developed.length > 0) next = addEvent(next, player.name + " paid building maintenance for passing Shurur Line.", "money");
   }
@@ -366,6 +380,8 @@ export function resolvePropertyAction(state: GameState, action: PropertyAction):
     next = { ...state, pendingPropertyId: null };
     next = addEvent(next, `${player.name} declined ${space.name}.`);
   }
+  next = recordDecision(next, player.role, action);
+  if (action !== "decline") next = recordFlow(next, player.id, "out", "property", selected.cost);
   return checkVictory(next);
 }
 export type BuildingAction = "house" | "hotel";
@@ -401,7 +417,7 @@ export function buildProperty(state: GameState, playerId: string, spaceId: strin
   if (cost <= 0 || player.cash < cost) throw new Error("Not enough cash for this building.");
   const updated = action === "house" ? { ...property, houses: houses + 1, hotel: false } : { ...property, houses: 0, hotel: true };
   const next: GameState = { ...state, players: state.players.map((item) => item.id === playerId ? { ...item, cash: item.cash - cost } : item), properties: { ...state.properties, [spaceId]: updated } };
-  return checkVictory(addEvent(next, player.name + " built " + (action === "hotel" ? "a hotel" : "a house") + " on " + space.name + " for ৳" + cost + ". Rent multiplier is now " + getBuildingRentMultiplier(updated) + "×.", "money"));
+  return checkVictory(addEvent(recordBuild(recordFlow(next, playerId, "out", "building", cost), player.role), player.name + " built " + (action === "hotel" ? "a hotel" : "a house") + " on " + space.name + " for ৳" + cost + ". Rent multiplier is now " + getBuildingRentMultiplier(updated) + "×.", "money"));
 }
 
 export interface LegalBuildAction { spaceId: string; action: BuildingAction; cost: number; rentGain: number; }
@@ -462,6 +478,7 @@ export function mortgageProperty(state: GameState, playerId: string, spaceId: st
     publicFund: state.publicFund + terms.processingFee,
     properties: { ...state.properties, [spaceId]: { ...property, mortgaged: true } },
   };
+  next = recordFlow(next, playerId, "in", "mortgage", terms.netAdvance);
   next = addEvent(next, `${player.name} mortgaged ${space.name}: gross loan ৳${terms.grossAdvance}, processing fee ৳${terms.processingFee}, net received ৳${terms.netAdvance}. Redemption costs ৳${terms.redemptionAmount}.`, "money");
   return checkVictory(next);
 }
@@ -482,6 +499,7 @@ export function redeemMortgage(state: GameState, playerId: string, spaceId: stri
     players: state.players.map((item) => item.id === playerId ? { ...item, cash: item.cash - amount } : item),
     properties: { ...state.properties, [spaceId]: { ...property, mortgaged: false } },
   };
+  next = recordFlow(next, playerId, "out", "redeem", amount);
   next = addEvent(next, `${player.name} cleared the mortgage on ${space.name} by paying ৳${amount} (principal plus ${player.role === "politician" ? "8%" : "10%"} interest).`, "money");
   return checkVictory(next);
 }
@@ -514,6 +532,7 @@ export function sellProperty(state: GameState, sellerId: string, spaceId: string
       publicFund: state.publicFund + tax,
       properties: { ...state.properties, [spaceId]: { ...property, ownerId: politician.id, mortgaged: false } },
     };
+    next = recordFlow(recordFlow(next, sellerId, "in", "sale", proceeds), politician.id, "out", "sale", price);
     next = addEvent(next, `${seller.name} sold ${space.name} to the Politician for ৳${price}; ৳${tax} (10%) was paid to the public treasury and the seller received ৳${proceeds}.`, "money");
     return checkVictory(next);
   }
@@ -524,7 +543,7 @@ export function sellProperty(state: GameState, sellerId: string, spaceId: string
     // Land returned to the market is cleared of buildings so the next buyer does not receive free development.
     properties: { ...state.properties, [spaceId]: { ...property, ownerId: null, mortgaged: false, houses: 0, hotel: false } },
   };
-  return checkVictory(addEvent(next, `${seller.name} sold ${space.name} back to the government for ৳${price}; no sales tax was charged. The property is now unowned and any buildings were demolished.`, "money"));
+  return checkVictory(addEvent(recordFlow(next, sellerId, "in", "sale", price), `${seller.name} sold ${space.name} back to the government for ৳${price}; no sales tax was charged. The property is now unowned and any buildings were demolished.`, "money"));
 }
 export function endTurn(state: GameState): GameState {
   if (state.phase !== "awaiting-end-turn") throw new Error("Roll and resolve movement before ending the turn.");
@@ -554,6 +573,7 @@ export function endTurn(state: GameState): GameState {
     }
     next = { ...next, players: nextPlayers, currentPlayerIndex: nextIndex, round };
     next = addEvent(next, `Round ${round}: ${next.players[nextIndex].name}'s turn.`);
+    if (round !== state.round) next = recordCashSnapshot(next);
     return checkVictory(next);
   }
   return checkVictory(next);

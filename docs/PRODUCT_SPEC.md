@@ -16,7 +16,7 @@ The game uses a familiar roll-move-property-rent-cards loop. Its central asymmet
 - Deterministic, testable rules and simple local setup.
 
 ## MVP non-goals
-No local pass-and-play, accounts, remote AI APIs, real-money transactions, analytics/backend, or identifiable real-world political actors. Do not copy Monopoly branding, board art, or card text. AI logic runs locally and does not require network access.
+No local pass-and-play, accounts, remote AI APIs, real-money transactions, personal-data analytics, or identifiable real-world political actors. Do not copy Monopoly branding, board art, or card text. AI logic runs locally and does not require network access.
 
 ## Online multiplayer (separate mode)
 Room-code online play for 2–6 human players is available as a separate mode (RD-128, docs/MULTIPLAYER_PLAN.md). It has no AI seats, picks the Politician at random when the host starts, and uses the same rules and game screen as single-player.

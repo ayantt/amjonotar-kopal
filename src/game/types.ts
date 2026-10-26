@@ -1,4 +1,5 @@
 import type { BoardSpace } from "./board.js";
+import type { GameStats } from "./stats.js";
 export type PlayerRole = "politician" | "citizen";
 export type Controller = "human" | "ai";
 export interface Player {
@@ -23,6 +24,7 @@ export interface GameState {
   cooperativePropertyIds: string[];
   cardDrawCounts: { community: number; chance: number }; extraRollAvailable: boolean;
   pendingPropertyId: string | null; events: GameEvent[]; nextEventId: number;
+  /** Analytics counters recorded by the engine; absent on games saved before they existed. */ stats?: GameStats;
   round: number; /** Player id of the last player standing; null while the game is running. */ winner: string | null;
 }
 export interface NewGameOptions { humanRole: PlayerRole; }
