@@ -45,4 +45,4 @@ Exit: several laps can be played with all AI turns resolving reliably and proper
 - [ ] Clean install, test, build, static deployment.
 
 ## Deferred
-Local pass-and-play, online multiplayer/accounts, remote AI services, negotiation UI, Election Day challenge, analytics/backend, real-person likenesses.
+Local pass-and-play, accounts, remote AI services, negotiation UI, Election Day challenge, personal-data analytics, real-person likenesses.

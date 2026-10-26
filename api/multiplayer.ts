@@ -1,7 +1,9 @@
 import { randomBytes, createHash } from "node:crypto";
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 import { applyMultiplayerAction, createMultiplayerGame, type MultiplayerAction } from "../src/game/engine.js";
+import { summarizeGame } from "../src/game/analytics.js";
 import type { GameState } from "../src/game/types.js";
+import { ensureAnalyticsTable, recordGameFinish, recordGameStart, type NeonSql as AnalyticsSql } from "../src/server/analyticsStore.js";
 
 type NeonSql = ReturnType<typeof import("@neondatabase/serverless").neon>;
 let neonModulePromise: Promise<typeof import("@neondatabase/serverless")> | undefined;
@@ -18,10 +20,23 @@ const publicRoom = (room: RoomRow) => ({
   version: room.version,
   hostPlayerId: room.hostPlayerId,
   seats: room.seats.map(({ playerId, name, role, joinedAt, lastSeenAt }) => ({ playerId, name, role, joinedAt, lastSeenAt })),
-  state: room.state,
+  // Analytics counters stay on the server; clients never need them and they would only grow every poll response.
+  state: room.state ? (({ stats: _stats, ...visible }) => visible)(room.state) : null,
   createdAt: room.createdAt,
   expiresAt: room.expiresAt,
 });
+/** Stable anonymous id for an online game: a hash of the room code and creation time, so the code itself is never stored. */
+const onlineGameId = (room: RoomRow) => "online-" + createHash("sha256").update(`${room.code}:${room.createdAt}`).digest("hex").slice(0, 32);
+/** Analytics must never affect gameplay: failures are logged and swallowed. */
+async function recordOnlineAnalytics(sql: NeonSql, record: (analyticsSql: AnalyticsSql) => Promise<void>) {
+  try {
+    const analyticsSql = sql as unknown as AnalyticsSql;
+    await ensureAnalyticsTable(analyticsSql);
+    await record(analyticsSql);
+  } catch (error) {
+    console.error("Analytics recording failed", error);
+  }
+}
 function send(res: VercelResponse, status: number, payload: unknown) {
   return res.status(status).json(payload);
 }
@@ -152,6 +167,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       const seats = room.seats.map((item, index) => ({ ...item, role: generatedState.players[index].role }));
       const next = { ...room, seats, status: "active" as const, state, version: room.version + 1 };
       if (!await saveRoom(sql, next, expectedVersion)) return send(res, 409, { error: "The room changed. Refresh and try again." });
+      await recordOnlineAnalytics(sql, (analyticsSql) => recordGameStart(analyticsSql, onlineGameId(room), "online", state.players.length, null));
       return send(res, 200, { room: { ...publicRoom(next), version: expectedVersion + 1 } });
     }
 
@@ -188,6 +204,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         if (latest?.lastActionId === requestId) return send(res, 200, { room: publicRoom(latest), duplicate: true });
         return send(res, 409, { error: "Another action was processed first. The latest room state is included.", room: latest ? publicRoom(latest) : undefined });
       }
+      if (state.phase === "game-over") await recordOnlineAnalytics(sql, (analyticsSql) => recordGameFinish(analyticsSql, onlineGameId(room), summarizeGame(state, "online")));
       return send(res, 200, { room: { ...publicRoom(next), version: expectedVersion + 1 } });
     }
 

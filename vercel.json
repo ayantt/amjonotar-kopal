@@ -3,6 +3,10 @@
     {
       "source": "/api/multiplayer/:path*",
       "destination": "/api/multiplayer?path=:path*"
+    },
+    {
+      "source": "/api/analytics/:path*",
+      "destination": "/api/analytics?path=:path*"
     }
   ]
 }
