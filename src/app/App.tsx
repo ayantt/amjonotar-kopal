@@ -105,7 +105,7 @@ export function App() {
   if (!game && showMultiplayer) return <MultiplayerLobby onBack={() => setShowMultiplayer(false)} />;
 
   if (!game) return <main className="app-shell">
-    <header className="masthead"><span className="seal">আ</span><span>PiStack POLITICS CLUB</span><span className="masthead-right">BOARD GAME NO. 01</span></header>
+    <header className="masthead"><span className="seal">আ</span><span>PiFLUX POLITICS CLUB</span><span className="masthead-right">BOARD GAME NO. 01</span></header>
     <section className="hero">
       <p className="eyebrow">একটি রাজনৈতিক ব্যঙ্গাত্মক বোর্ড গেম</p>
       <h1>আমজনতার<br /><em>কপাল।</em></h1>

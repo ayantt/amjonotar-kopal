@@ -197,7 +197,7 @@ export function MultiplayerLobby({ onBack }: { onBack: () => void }) {
   }
 
   return <main className="app-shell multiplayer-shell">
-    <header className="masthead"><span className="seal">আ</span><span>PiStack POLITICS CLUB</span><button className="secondary-action" onClick={onBack}>SINGLE PLAYER ↗</button></header>
+    <header className="masthead"><span className="seal">আ</span><span>PiFLUX POLITICS CLUB</span><button className="secondary-action" onClick={onBack}>SINGLE PLAYER ↗</button></header>
     {!room?.state && <section className="hero multiplayer-hero">
       <p className="eyebrow">ONLINE MODE · ROOM-CODE MULTIPLAYER</p>
       <h1>Play<br/><em>together.</em></h1>
