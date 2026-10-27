@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 
 type FakeRoom = {
@@ -9,16 +9,23 @@ type FakeRoom = {
   state: Record<string, unknown> | null;
   version: number;
   lastActionId?: string | null;
+  lastActionAt?: string | null;
   createdAt: string;
   expiresAt: string;
 };
 
-const db = vi.hoisted(() => ({ room: null as FakeRoom | null }));
+const db = vi.hoisted(() => ({ room: null as FakeRoom | null, limits: new Map<string, number>() }));
 
 vi.mock("@neondatabase/serverless", () => ({
   neon: () => async (strings: TemplateStringsArray, ...values: unknown[]) => {
     const query = strings.join(" ? ").replace(/\s+/g, " ").trim();
     if (query.startsWith("CREATE TABLE") || query.startsWith("ALTER TABLE")) return [];
+    if (query.startsWith("INSERT INTO rate_limits")) {
+      const key = `${values[0]}|${values[1]}`;
+      const count = (db.limits.get(key) ?? 0) + 1;
+      db.limits.set(key, count);
+      return [{ count }];
+    }
     if (query.startsWith("INSERT INTO multiplayer_rooms")) {
       const room: FakeRoom = {
         code: String(values[0]),
@@ -48,6 +55,7 @@ vi.mock("@neondatabase/serverless", () => ({
       room.state = values[2] ? JSON.parse(String(values[2])) : null;
       if (values[3] != null) room.lastActionId = String(values[3]);
       room.version += 1;
+      room.lastActionAt = new Date().toISOString();
       return [{ version: room.version }];
     }
     if (query.startsWith("UPDATE multiplayer_rooms SET seats")) {
@@ -73,12 +81,12 @@ function makeResponse(): VercelResponse & CapturedResponse {
   };
   return response as unknown as VercelResponse & CapturedResponse;
 }
-async function call(path: string, method = "GET", body: Record<string, unknown> = {}, token?: string) {
+async function call(path: string, method = "GET", body: Record<string, unknown> = {}, token?: string, extraHeaders: Record<string, string> = {}) {
   const req = {
     method,
     query: { path },
     body,
-    headers: token ? { authorization: `Bearer ${token}` } : {},
+    headers: { ...(token ? { authorization: `Bearer ${token}` } : {}), ...extraHeaders },
   } as unknown as VercelRequest;
   const res = makeResponse();
   await handler(req, res);
@@ -104,6 +112,7 @@ async function createAndStartRoom() {
 describe("multiplayer API hardening", () => {
   beforeEach(() => {
     db.room = null;
+    db.limits.clear();
     process.env.DATABASE_URL = "postgres://test.invalid/fake";
   });
 
@@ -164,5 +173,126 @@ describe("multiplayer API hardening", () => {
     ]);
     expect(results.map((result) => result.statusCode).sort()).toEqual([200, 409]);
     expect(db.room?.version).toBe(game.room.version + 1);
+  });
+});
+
+describe("absent players", () => {
+  type RoomJson = { status: string; version: number; lastActionAt: string; seats: Array<{ playerId: string; missedTurns: number }>; state: { currentPlayerIndex: number; phase: string; winner: string | null; players: Array<{ id: string; bankrupt: boolean }>; events: Array<{ message: string }> } };
+  const T0 = Date.parse("2026-10-27T10:00:00Z");
+  beforeEach(() => {
+    db.room = null;
+    process.env.DATABASE_URL = "postgres://test.invalid/fake";
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(T0);
+  });
+  afterEach(() => { vi.useRealTimers(); });
+  const poll = async (code: string) => (await call(`rooms/${code}`, "GET")).body.room as unknown as RoomJson;
+
+  it("does not touch a game while the current player is present and within the time limit", async () => {
+    const game = await createAndStartRoom();
+    vi.setSystemTime(T0 + 60_000);
+    // Both players' browsers are open and sending heartbeats.
+    expect((await call(`rooms/${game.code}/heartbeat`, "POST", {}, game.hostToken)).statusCode).toBe(204);
+    expect((await call(`rooms/${game.code}/heartbeat`, "POST", {}, game.guestToken)).statusCode).toBe(204);
+    const room = await poll(game.code);
+    expect(room.version).toBe(game.room.version);
+    expect(room.state.events.some((e) => /is away/.test(e.message))).toBe(false);
+  });
+
+  it("plays an idle player's turn from a poll, passes play on and counts the miss", async () => {
+    const game = await createAndStartRoom();
+    vi.setSystemTime(T0 + 200_000);
+    const room = await poll(game.code);
+    expect(room.version).toBe(game.room.version + 1);
+    expect(room.state.currentPlayerIndex).not.toBe(game.room.state.currentPlayerIndex);
+    expect(room.state.events.some((e) => /is away, so the computer is playing their turn/.test(e.message))).toBe(true);
+    const absent = game.room.state.players[game.room.state.currentPlayerIndex].id;
+    expect(room.seats.find((s) => s.playerId === absent)?.missedTurns).toBe(1);
+    expect(new Date(room.lastActionAt).getTime()).toBe(T0 + 200_000);
+  });
+
+  it("starts a disconnected player's turn clock only after the grace period", async () => {
+    const game = await createAndStartRoom();
+    vi.setSystemTime(T0 + 19_000);
+    expect((await poll(game.code)).version).toBe(game.room.version);
+    vi.setSystemTime(T0 + 45_000);
+    expect((await poll(game.code)).version).toBe(game.room.version + 1);
+  });
+
+  it("forfeits a seat after three missed turns and finishes a two-player game for the other player", async () => {
+    const game = await createAndStartRoom();
+    let now = T0;
+    let room = await poll(game.code);
+    for (let step = 0; step < 12 && room.status === "active"; step += 1) {
+      now += 200_000;
+      vi.setSystemTime(now);
+      room = await poll(game.code);
+    }
+    expect(room.status).toBe("finished");
+    expect(room.state.phase).toBe("game-over");
+    expect(room.state.players.filter((p) => !p.bankrupt)).toHaveLength(1);
+    expect(room.state.players.some((p) => p.id === room.state.winner)).toBe(true);
+    expect(room.state.events.some((e) => /left the game and forfeited/.test(e.message))).toBe(true);
+  });
+
+  it("keeps the seat while the player keeps acting, resetting the missed-turn count", async () => {
+    const game = await createAndStartRoom();
+    vi.setSystemTime(T0 + 200_000);
+    let room = await poll(game.code);
+    const afterMiss = room.state.players[room.state.currentPlayerIndex].id;
+    const tokens = new Map([[db.room?.seats[0].playerId as string, game.hostToken], [db.room?.seats[1].playerId as string, game.guestToken]]);
+    const roll = await call(`rooms/${game.code}/actions`, "POST", { version: room.version, requestId: "123e4567-e89b-42d3-a456-426614174111", action: { type: "roll" } }, tokens.get(afterMiss));
+    expect(roll.statusCode).toBe(200);
+    room = roll.body.room as unknown as RoomJson;
+    expect(room.seats.every((s) => s.missedTurns <= 1)).toBe(true);
+  });
+
+  it("lets a player leave a running game; the seat forfeits and the last player wins", async () => {
+    const game = await createAndStartRoom();
+    const leave = await call(`rooms/${game.code}/forfeit`, "POST", {}, game.guestToken);
+    expect(leave.statusCode).toBe(200);
+    const room = leave.body.room as unknown as RoomJson;
+    expect(room.status).toBe("finished");
+    expect(room.state.winner).toBe(db.room?.seats[0].playerId);
+    expect((await call(`rooms/${game.code}/forfeit`, "POST", {}, game.guestToken)).statusCode).toBe(409);
+  });
+
+  it("requires a valid seat to forfeit and an active game", async () => {
+    const game = await createAndStartRoom();
+    expect((await call(`rooms/${game.code}/forfeit`, "POST", {})).statusCode).toBe(401);
+    expect((await call(`rooms/${game.code}/forfeit`, "POST", {}, "wrong-token")).statusCode).toBe(401);
+    const waiting = await call("rooms", "POST", { name: "Solo" });
+    const code = (waiting.body.room as { code: string }).code;
+    expect((await call(`rooms/${code}/forfeit`, "POST", {}, String(waiting.body.token))).statusCode).toBe(409);
+  });
+});
+
+describe("multiplayer rate limiting", () => {
+  beforeEach(() => {
+    db.room = null;
+    db.limits.clear();
+    process.env.DATABASE_URL = "postgres://test.invalid/fake";
+  });
+
+  it("blocks the sixth room created per minute from one address, with Retry-After", async () => {
+    const headers = { "x-real-ip": "203.0.113.7" };
+    for (let i = 0; i < 5; i++) expect((await call("rooms", "POST", { name: "Spam" }, undefined, headers)).statusCode).toBe(201);
+    const blocked = await call("rooms", "POST", { name: "Spam" }, undefined, headers);
+    expect(blocked.statusCode).toBe(429);
+    expect(Number(blocked.body.retryAfterSeconds)).toBeGreaterThan(0);
+    expect(blocked.setHeader).toHaveBeenCalledWith("Retry-After", expect.any(String));
+  });
+
+  it("limits each address separately and does not limit polling", async () => {
+    for (let i = 0; i < 5; i++) await call("rooms", "POST", { name: "A" }, undefined, { "x-real-ip": "203.0.113.7" });
+    expect((await call("rooms", "POST", { name: "B" }, undefined, { "x-real-ip": "198.51.100.9" })).statusCode).toBe(201);
+    const code = String((db.room as FakeRoom).code);
+    for (let i = 0; i < 40; i++) expect((await call(`rooms/${code}`, "GET", {}, undefined, { "x-real-ip": "203.0.113.7" })).statusCode).toBe(200);
+  });
+
+  it("falls back to the first x-forwarded-for entry", async () => {
+    const headers = { "x-forwarded-for": "192.0.2.1, 10.0.0.1" };
+    for (let i = 0; i < 5; i++) await call("rooms", "POST", { name: "A" }, undefined, headers);
+    expect((await call("rooms", "POST", { name: "A" }, undefined, { "x-forwarded-for": "192.0.2.1, 10.9.9.9" })).statusCode).toBe(429);
   });
 });

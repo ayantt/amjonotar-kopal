@@ -70,3 +70,6 @@ The current engine creates exactly one human seat and three AI seats, and severa
 ## Deployment prerequisites
 
 The online API requires a Postgres database and the server-only `DATABASE_URL` configured in Vercel. Deploy the API and frontend together on the same origin. To run the deployment smoke test automatically in CI, set the repository Actions variable `MULTIPLAYER_SMOKE_URL` to the deployed app base URL; the test creates a temporary room and leaves it to expire. Never commit production environment variables to Git. A passing local unit/API suite, CI result, and live smoke test must be confirmed before calling the release verified.
+
+## Absence, forfeit and limits
+Players who close their tab no longer strand a room: the server plays their turns and forfeits them after three misses, and the LEAVE button forfeits at once (RD-130). Requests are rate limited per address and old rows are removed by a daily cron (RD-132). Configure `CRON_SECRET` in Vercel (Cron sends it as a bearer token) and optionally `RATE_LIMIT_SALT`.

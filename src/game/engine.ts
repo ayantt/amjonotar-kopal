@@ -582,6 +582,36 @@ export function getCurrentPlayer(state: GameState): Player { return state.player
 export function isHumanTurn(state: GameState): boolean {
   return (state.phase === "awaiting-roll" || state.phase === "awaiting-end-turn") && getCurrentPlayer(state).controller === "human";
 }
+/** Adds a plain log entry (used by server-side features such as absent-player handling). */
+export function announce(state: GameState, message: string, kind: GameEvent["kind"] = "system"): GameState {
+  return addEvent(state, message, kind);
+}
+
+/**
+ * A player leaves the match for good (online play): their cash goes to the public treasury, their property returns to the
+ * unowned market without buildings, and they are out. The last player standing still wins (RD-125). If it was their turn,
+ * play passes on. Already-bankrupt players and finished games are left untouched.
+ */
+export function forfeitPlayer(state: GameState, playerId: string): GameState {
+  const player = state.players.find((p) => p.id === playerId);
+  if (!player || player.bankrupt || state.phase === "game-over") return state;
+  let next: GameState = {
+    ...state,
+    publicFund: state.publicFund + player.cash,
+    players: state.players.map((p) => p.id === playerId ? { ...p, cash: 0, bankrupt: true, active: false } : p),
+    properties: Object.fromEntries(Object.entries(state.properties).map(([id, property]) => property.ownerId === playerId
+      ? [id, { ...property, ownerId: null, leaseholderId: null, leaseExpiresAtGoPass: null, mortgaged: false, houses: 0, hotel: false }]
+      : property.leaseholderId === playerId ? [id, { ...property, leaseholderId: null, leaseExpiresAtGoPass: null }] : [id, property])),
+  };
+  next = recordBankruptcy(next, playerId, "other");
+  next = addEvent(next, `${player.name} left the game and forfeited. Their cash went to the public treasury and their property returned to the market.`);
+  next = checkVictory(next);
+  if (next.phase !== "game-over" && getCurrentPlayer(next).id === playerId) {
+    next = endTurn({ ...next, phase: "awaiting-end-turn", pendingPropertyId: null, extraRollAvailable: false });
+  }
+  return next;
+}
+
 export function validateSetup(state: GameState): boolean {
   return state.players.length === 4 && state.players.filter((p) => p.role === "politician").length === 1 &&
     state.players.filter((p) => p.role === "citizen").length === 3 && state.players.filter((p) => p.controller === "human").length === 1 &&

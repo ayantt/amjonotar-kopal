@@ -305,3 +305,4 @@
 .viz-table{margin-top:.8rem;font-size:.82rem}.viz-table summary{cursor:pointer;color:#5b564b}
 @media(max-width:760px){.viz-grid{grid-template-columns:1fr}.viz-bars li{grid-template-columns:minmax(70px,7rem) 1fr auto}.viz-kpi strong{font-size:1.4rem}.viz-tip{position:static;margin-top:.4rem}}
 .viz-chart svg{max-width:100%}.viz-role-row .viz-note{margin:.3rem 0 0}
+.resume-card{display:flex;align-items:center;justify-content:space-between;gap:1rem;flex-wrap:wrap;margin:0 0 1.4rem;padding:1rem 1.2rem;border:2px solid var(--ink);background:#fffdf7}.resume-card>div:first-child{display:flex;flex-direction:column;gap:.2rem;min-width:0}.resume-card strong{font-size:1.25rem}.resume-actions{display:flex;gap:.6rem;flex-wrap:wrap}

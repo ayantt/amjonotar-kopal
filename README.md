@@ -45,3 +45,5 @@ Checks: `npm run typecheck`, `npm test`, `npm run build`.
 - Integer Bangladeshi taka (৳).
 - Last player standing wins: the game ends when every other player is bankrupt.
 - Engine owns validation and state transitions.
+
+Reliability: single-player games autosave in the browser and offer **Resume** after a refresh. Online rooms auto-play for absent players and forfeit them after three missed turns. The server rate limits abusive clients and a daily cron (`/api/maintenance`) prunes old data. Environment: `DATABASE_URL`, `ANALYTICS_ADMIN_TOKEN`, `CRON_SECRET` (required for the cron), optional `RATE_LIMIT_SALT`.

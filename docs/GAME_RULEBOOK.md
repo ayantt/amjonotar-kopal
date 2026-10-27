@@ -3,7 +3,7 @@
 Provisional values must be play-tested. If documents conflict, resolve it in RULE_DECISIONS.md before coding.
 
 ## Setup
-This section describes single-player. In online multiplayer (RD-128) a room holds 2–6 human players with no AI seats; the host starts the game, one seat is drawn at random as Politician, and everyone else is a Citizen. Turns follow join order, and every rule below applies unchanged.
+This section describes single-player. In online multiplayer (RD-128) a room holds 2–6 human players with no AI seats; the host starts the game, one seat is drawn at random as Politician, and everyone else is a Citizen. Turns follow join order, and every rule below applies unchanged. A player who is away is replaced by the computer for that turn, and forfeits after three missed turns in a row or on leaving (RD-130): cash goes to the public fund and properties return to the bank. Single-player games autosave and can be resumed after a refresh (RD-131).
 
 Exactly four seats: one human-controlled player and three AI-controlled players. The human chooses Politician or Citizen; fill remaining seats with AI while preserving exactly one Politician and three Citizens. There is no local pass-and-play. AI turns advance automatically and display their actions in the event log.
 

@@ -41,7 +41,8 @@ Exit: several laps can be played with all AI turns resolving reliably and proper
 - [ ] Responsive board/property inspector and clear action panel.
 - [ ] Bangla-facing labels/tutorial/rule reference.
 - [ ] AI pacing controls and decision explanations.
-- [ ] Versioned local save, accessibility pass.
+- [x] Versioned local save (RD-131).
+- [ ] Accessibility pass.
 - [ ] Clean install, test, build, static deployment.
 
 ## Deferred
