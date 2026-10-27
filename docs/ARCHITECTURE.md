@@ -77,4 +77,5 @@ Each action validates phase, actor, ownership, and affordability; computes befor
 - Game-over state is terminal.
 - AI can select only from engine-generated legal actions and receives no hidden-state access.
 - Production randomness is wrapped behind an injectable RandomSource; tests are deterministic.
-- Stored saves, when introduced, are versioned and validated.
+- Stored saves are versioned and validated (`src/game/save.ts`, `src/app/saveStorage.ts`, RD-131).
+- Server abuse controls: `src/server/rateLimit.ts` (Postgres fixed-window limiter, fails open), `src/server/cleanup.ts` and `api/maintenance.ts` (daily cron, `CRON_SECRET`; optional `RATE_LIMIT_SALT`), absence handling in `src/server/roomTick.ts` (RD-130, RD-132).

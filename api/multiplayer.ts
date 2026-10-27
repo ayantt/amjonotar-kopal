@@ -1,14 +1,19 @@
 import { randomBytes, createHash } from "node:crypto";
 import type { VercelRequest, VercelResponse } from "@vercel/node";
-import { applyMultiplayerAction, createMultiplayerGame, type MultiplayerAction } from "../src/game/engine.js";
+import { applyMultiplayerAction, createMultiplayerGame, forfeitPlayer, type MultiplayerAction } from "../src/game/engine.js";
 import { summarizeGame } from "../src/game/analytics.js";
 import type { GameState } from "../src/game/types.js";
+import { advanceAbsentPlayer } from "../src/server/roomTick.js";
 import { ensureAnalyticsTable, recordGameFinish, recordGameStart, type NeonSql as AnalyticsSql } from "../src/server/analyticsStore.js";
+import { clientIp, checkRateLimits, RATE_RULES, type RateRule } from "../src/server/rateLimit.js";
+import { pruneStaleData } from "../src/server/cleanup.js";
 
 type NeonSql = ReturnType<typeof import("@neondatabase/serverless").neon>;
 let neonModulePromise: Promise<typeof import("@neondatabase/serverless")> | undefined;
-type Seat = { playerId: string; name: string; role: "politician" | "citizen" | null; tokenHash: string; joinedAt: string; lastSeenAt?: string };
-type RoomRow = { code: string; status: "waiting" | "active" | "finished"; hostPlayerId: string; seats: Seat[]; state: GameState | null; version: number; lastActionId?: string | null; createdAt: string; expiresAt: string };
+/** Table setup only needs to run once per warm server instance. */
+let schemaReady = false;
+type Seat = { playerId: string; name: string; role: "politician" | "citizen" | null; tokenHash: string; joinedAt: string; lastSeenAt?: string; missedTurns?: number };
+type RoomRow = { code: string; status: "waiting" | "active" | "finished"; hostPlayerId: string; seats: Seat[]; state: GameState | null; version: number; lastActionId?: string | null; lastActionAt?: string | null; createdAt: string; expiresAt: string };
 const codeAlphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
 const hashToken = (token: string) => createHash("sha256").update(token).digest("hex");
 const newToken = () => randomBytes(32).toString("base64url");
@@ -19,7 +24,8 @@ const publicRoom = (room: RoomRow) => ({
   status: room.status,
   version: room.version,
   hostPlayerId: room.hostPlayerId,
-  seats: room.seats.map(({ playerId, name, role, joinedAt, lastSeenAt }) => ({ playerId, name, role, joinedAt, lastSeenAt })),
+  seats: room.seats.map(({ playerId, name, role, joinedAt, lastSeenAt, missedTurns }) => ({ playerId, name, role, joinedAt, lastSeenAt, missedTurns: missedTurns ?? 0 })),
+  lastActionAt: room.lastActionAt ?? room.createdAt,
   // Analytics counters stay on the server; clients never need them and they would only grow every poll response.
   state: room.state ? (({ stats: _stats, ...visible }) => visible)(room.state) : null,
   createdAt: room.createdAt,
@@ -52,12 +58,46 @@ function seatFrom(req: VercelRequest, room: RoomRow): Seat | undefined {
   return room.seats.find((seat) => seat.tokenHash === hash);
 }
 async function readRoom(sql: NeonSql, code: string): Promise<RoomRow | null> {
-  const rows = await sql`SELECT code, status, host_player_id AS "hostPlayerId", seats, state, version, last_action_id AS "lastActionId", created_at AS "createdAt", expires_at AS "expiresAt" FROM multiplayer_rooms WHERE code = ${code} AND expires_at > NOW() LIMIT 1`;
+  const rows = await sql`SELECT code, status, host_player_id AS "hostPlayerId", seats, state, version, last_action_id AS "lastActionId", last_action_at AS "lastActionAt", created_at AS "createdAt", expires_at AS "expiresAt" FROM multiplayer_rooms WHERE code = ${code} AND expires_at > NOW() LIMIT 1`;
   return (rows[0] as unknown as RoomRow) ?? null;
 }
 async function saveRoom(sql: NeonSql, room: RoomRow, expectedVersion: number, actionId?: string) {
-  const rows = await sql`UPDATE multiplayer_rooms SET status = ${room.status}, seats = ${JSON.stringify(room.seats)}::jsonb, state = ${room.state ? JSON.stringify(room.state) : null}::jsonb, last_action_id = COALESCE(${actionId ?? null}, last_action_id), version = version + 1 WHERE code = ${room.code} AND version = ${expectedVersion} AND expires_at > NOW() RETURNING version`;
+  const rows = await sql`UPDATE multiplayer_rooms SET status = ${room.status}, seats = ${JSON.stringify(room.seats)}::jsonb, state = ${room.state ? JSON.stringify(room.state) : null}::jsonb, last_action_id = COALESCE(${actionId ?? null}, last_action_id), version = version + 1, last_action_at = NOW() WHERE code = ${room.code} AND version = ${expectedVersion} AND expires_at > NOW() RETURNING version`;
   return rows.length > 0;
+}
+
+/**
+ * Lazy turn watchdog: whoever polls the room also moves a stuck game along. If the current player is away or idle, the
+ * computer plays their turn (or the seat forfeits after repeated misses). Losing the optimistic-concurrency race to
+ * another poll or a real action is fine: the latest room is returned instead.
+ */
+async function autoAdvance(sql: NeonSql, room: RoomRow): Promise<RoomRow> {
+  if (room.status !== "active" || !room.state) return room;
+  try {
+    const result = advanceAbsentPlayer({ state: room.state, seats: room.seats, turnStartedAt: room.lastActionAt ?? room.createdAt, now: Date.now() });
+    if (result.outcome === "none") return room;
+    const next: RoomRow = { ...room, state: result.state, seats: result.seats, status: result.state.phase === "game-over" ? "finished" : "active", version: room.version + 1, lastActionAt: new Date().toISOString() };
+    if (!await saveRoom(sql, next, room.version)) return (await readRoom(sql, room.code)) ?? room;
+    if (result.state.phase === "game-over") await recordOnlineAnalytics(sql, (analyticsSql) => recordGameFinish(analyticsSql, onlineGameId(room), summarizeGame(result.state, "online")));
+    return next;
+  } catch (error) {
+    console.error("Absent-player handling failed", error);
+    return room;
+  }
+}
+
+/** Which rate rules apply to a request. Reads (polling) and heartbeats are intentionally unlimited. */
+function rulesFor(parts: string[], method: string): readonly RateRule[] | null {
+  if (method !== "POST") return null;
+  if (parts.length === 1) return RATE_RULES.createRoom;
+  switch (parts[2]) {
+    case "join": return RATE_RULES.joinRoom;
+    case "actions": return RATE_RULES.action;
+    case "forfeit": return RATE_RULES.forfeit;
+    case "start":
+    case "leave": return RATE_RULES.roomAdmin;
+    default: return null;
+  }
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
@@ -75,7 +115,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const roomAction = parts[2];
   const isRoomRead = parts.length === 2 && /^[A-HJ-NP-Z2-9]{6}$/.test(roomCode) && method === "GET";
   const isRoomMutation = parts.length === 3 && /^[A-HJ-NP-Z2-9]{6}$/.test(roomCode) &&
-    ["join", "start", "actions", "leave", "heartbeat"].includes(roomAction ?? "") && method === "POST";
+    ["join", "start", "actions", "leave", "heartbeat", "forfeit"].includes(roomAction ?? "") && method === "POST";
 
   if (isRoomCollection && method !== "POST") {
     res.setHeader("Allow", "POST");
@@ -91,20 +131,35 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   try {
     const { neon } = await (neonModulePromise ??= import("@neondatabase/serverless"));
     const sql = neon(connectionString);
-    await sql`CREATE TABLE IF NOT EXISTS multiplayer_rooms (
-      code text PRIMARY KEY,
-      status text NOT NULL CHECK (status IN ('waiting', 'active', 'finished')),
-      host_player_id text NOT NULL,
-      seats jsonb NOT NULL DEFAULT '[]'::jsonb,
-      state jsonb,
-      version integer NOT NULL DEFAULT 0,
-      created_at timestamptz NOT NULL DEFAULT NOW(),
-      expires_at timestamptz NOT NULL,
-      last_action_id text
-    )`;
-    await sql`ALTER TABLE multiplayer_rooms ADD COLUMN IF NOT EXISTS last_action_id text`;
+    if (!schemaReady) {
+      await sql`CREATE TABLE IF NOT EXISTS multiplayer_rooms (
+        code text PRIMARY KEY,
+        status text NOT NULL CHECK (status IN ('waiting', 'active', 'finished')),
+        host_player_id text NOT NULL,
+        seats jsonb NOT NULL DEFAULT '[]'::jsonb,
+        state jsonb,
+        version integer NOT NULL DEFAULT 0,
+        created_at timestamptz NOT NULL DEFAULT NOW(),
+        expires_at timestamptz NOT NULL,
+        last_action_id text
+      )`;
+      await sql`ALTER TABLE multiplayer_rooms ADD COLUMN IF NOT EXISTS last_action_id text`;
+      await sql`ALTER TABLE multiplayer_rooms ADD COLUMN IF NOT EXISTS last_action_at timestamptz`;
+      schemaReady = true;
+    }
+
+    const rules = rulesFor(parts, method);
+    if (rules) {
+      const decision = await checkRateLimits(sql as unknown as AnalyticsSql, clientIp(req.headers), rules, { salt: process.env.RATE_LIMIT_SALT });
+      if (!decision.allowed) {
+        res.setHeader("Retry-After", String(decision.retryAfterSeconds));
+        return send(res, 429, { error: `Too many requests. Please wait ${decision.retryAfterSeconds} seconds and try again.`, retryAfterSeconds: decision.retryAfterSeconds });
+      }
+    }
 
     if (parts.length === 1 && parts[0] === "rooms" && method === "POST") {
+      // Fallback housekeeping in case the daily cron is not configured; the cron remains the primary mechanism.
+      if (Math.random() < 0.02) void pruneStaleData(sql as unknown as AnalyticsSql).catch(() => undefined);
       const name = cleanName(bodyOf(req).name);
       if (!name) return send(res, 400, { error: "Enter a display name (up to 24 characters)." });
       const token = newToken();
@@ -125,7 +180,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const room = await readRoom(sql, code);
     if (!room) return send(res, 404, { error: "Room not found or expired." });
 
-    if (parts.length === 2 && method === "GET") return send(res, 200, { room: publicRoom(room) });
+    if (parts.length === 2 && method === "GET") return send(res, 200, { room: publicRoom(await autoAdvance(sql, room)) });
 
     if (parts[2] === "join" && method === "POST") {
       if (room.status !== "waiting") return send(res, 409, { error: "This room has already started." });
@@ -198,7 +253,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       } catch (error) {
         return send(res, 422, { error: error instanceof Error ? error.message : "That action is not legal." });
       }
-      const next = { ...room, status: state.phase === "game-over" ? "finished" as const : "active" as const, state, version: room.version + 1 };
+      const seats = room.seats.map((item) => item.playerId === seat.playerId && item.missedTurns ? { ...item, missedTurns: 0 } : item);
+      const next = { ...room, seats, status: state.phase === "game-over" ? "finished" as const : "active" as const, state, version: room.version + 1 };
       if (!await saveRoom(sql, next, expectedVersion, requestId)) {
         const latest = await readRoom(sql, code);
         if (latest?.lastActionId === requestId) return send(res, 200, { room: publicRoom(latest), duplicate: true });
@@ -206,6 +262,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       }
       if (state.phase === "game-over") await recordOnlineAnalytics(sql, (analyticsSql) => recordGameFinish(analyticsSql, onlineGameId(room), summarizeGame(state, "online")));
       return send(res, 200, { room: { ...publicRoom(next), version: expectedVersion + 1 } });
+    }
+
+    if (parts[2] === "forfeit" && method === "POST") {
+      // A player may give up their seat at any time during a game; the same rule applies when they stay away (RD-130).
+      if (room.status !== "active" || !room.state) return send(res, 409, { error: "There is no active game to leave." });
+      const state = forfeitPlayer(room.state, seat.playerId);
+      if (state === room.state) return send(res, 409, { error: "You are already out of this game." });
+      const next: RoomRow = { ...room, state, status: state.phase === "game-over" ? "finished" : "active", version: room.version + 1, lastActionAt: new Date().toISOString() };
+      if (!await saveRoom(sql, next, room.version)) return send(res, 409, { error: "The room changed. Refresh and try again.", room: publicRoom((await readRoom(sql, code)) ?? room) });
+      if (state.phase === "game-over") await recordOnlineAnalytics(sql, (analyticsSql) => recordGameFinish(analyticsSql, onlineGameId(room), summarizeGame(state, "online")));
+      return send(res, 200, { room: publicRoom(next) });
     }
 
     if (parts[2] === "leave" && method === "POST") {

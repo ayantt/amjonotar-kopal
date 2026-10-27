@@ -4,12 +4,17 @@ import { summarizeGame } from "../../src/game/analytics";
 import { simulateAiGame } from "../../src/game/simulate";
 
 type Row = { game_id: string; mode: string; player_count: number; human_role: string | null; started_at: string; finished_at: string | null; summary: unknown; last_round?: number | null; last_seen_at?: string | null };
-const db = vi.hoisted(() => ({ rows: new Map<string, Row>() }));
+const db = vi.hoisted(() => ({ rows: new Map<string, Row>(), limits: new Map<string, number>() }));
 
 vi.mock("@neondatabase/serverless", () => ({
   neon: () => async (strings: TemplateStringsArray, ...values: unknown[]) => {
     const query = strings.join(" ? ").replace(/\s+/g, " ").trim();
     if (query.startsWith("CREATE TABLE") || query.startsWith("ALTER TABLE")) return [];
+    if (query.startsWith("INSERT INTO rate_limits")) {
+      const key = `${values[0]}|${values[1]}`;
+      db.limits.set(key, (db.limits.get(key) ?? 0) + 1);
+      return [{ count: db.limits.get(key) }];
+    }
     if (query.startsWith("UPDATE analytics_games")) {
       const [round, id] = values as [number, string];
       const row = db.rows.get(id);
@@ -43,8 +48,8 @@ function makeResponse() {
     json(body: Record<string, unknown>) { this.body = body; return this; } };
   return response as unknown as VercelResponse & { statusCode: number; body: Record<string, unknown> };
 }
-async function call(path: string, method: string, body: Record<string, unknown> = {}, token?: string) {
-  const req = { method, query: { path }, body, headers: token ? { authorization: `Bearer ${token}` } : {} } as unknown as VercelRequest;
+async function call(path: string, method: string, body: Record<string, unknown> = {}, token?: string, ip?: string) {
+  const req = { method, query: { path }, body, headers: { ...(token ? { authorization: `Bearer ${token}` } : {}), ...(ip ? { "x-real-ip": ip } : {}) } } as unknown as VercelRequest;
   const res = makeResponse();
   await handler(req, res);
   return res;
@@ -58,6 +63,7 @@ const summary = () => {
 describe("analytics API", () => {
   beforeEach(() => {
     db.rows.clear();
+    db.limits.clear();
     process.env.DATABASE_URL = "postgres://test.invalid/fake";
     process.env.ANALYTICS_ADMIN_TOKEN = "correct-token";
   });
@@ -128,5 +134,28 @@ describe("analytics API", () => {
     expect((await call("nope", "GET")).statusCode).toBe(404);
     delete process.env.DATABASE_URL;
     expect((await call("games/start", "POST", { gameId: GAME_ID, mode: "single", humanRole: "citizen" })).statusCode).toBe(503);
+  });
+});
+
+describe("analytics rate limiting", () => {
+  beforeEach(() => {
+    db.rows.clear();
+    db.limits.clear();
+    process.env.DATABASE_URL = "postgres://test.invalid/fake";
+    process.env.ANALYTICS_ADMIN_TOKEN = "correct-token";
+  });
+
+  it("limits write floods per address", async () => {
+    for (let i = 0; i < 120; i++) expect((await call("games/progress", "POST", { gameId: GAME_ID, round: 1 }, undefined, "203.0.113.1")).statusCode).toBe(204);
+    const blocked = await call("games/progress", "POST", { gameId: GAME_ID, round: 1 }, undefined, "203.0.113.1");
+    expect(blocked.statusCode).toBe(429);
+    expect((await call("games/progress", "POST", { gameId: GAME_ID, round: 1 }, undefined, "203.0.113.2")).statusCode).toBe(204);
+  });
+
+  it("throttles admin-token guessing but still lets the right token in below the limit", async () => {
+    for (let i = 0; i < 20; i++) expect((await call("summary", "GET", {}, "guess" + i, "198.51.100.5")).statusCode).toBe(401);
+    expect((await call("summary", "GET", {}, "guess-final", "198.51.100.5")).statusCode).toBe(429);
+    expect((await call("summary", "GET", {}, "correct-token", "198.51.100.5")).statusCode).toBe(429);
+    expect((await call("summary", "GET", {}, "correct-token", "198.51.100.6")).statusCode).toBe(200);
   });
 });

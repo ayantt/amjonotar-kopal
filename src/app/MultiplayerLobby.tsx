@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { GameState } from "../game/types";
 import { GameScreen, type GameActions } from "./GameScreen";
+import { ABSENCE, isSeatAway } from "../game/absence";
 import { loadPlayerName, savePlayerName } from "./playerName";
 import { useEventFeed } from "./useEventFeed";
 
-type PublicSeat = { playerId: string; name: string; role: "politician" | "citizen" | null; joinedAt: string; lastSeenAt?: string };
+type PublicSeat = { playerId: string; name: string; role: "politician" | "citizen" | null; joinedAt: string; lastSeenAt?: string; missedTurns?: number };
 type Room = { code: string; status: "waiting" | "active" | "finished"; version: number; hostPlayerId: string; seats: PublicSeat[]; state: GameState | null; createdAt: string; expiresAt: string };
 type Credentials = { code: string; playerId: string; token: string };
 const storageKey = "amjonotar-kopal-multiplayer-seat";
@@ -14,6 +15,11 @@ class MultiplayerRequestError extends Error {
 async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   const response = await fetch(path, { ...init, headers: { "Content-Type": "application/json", ...(init.headers ?? {}) } });
   const data = await response.json().catch(() => ({})) as Record<string, unknown>;
+  if (response.status === 429) {
+    const wait = Number(data.retryAfterSeconds ?? response.headers.get("Retry-After") ?? 0);
+    const suffix = Number.isFinite(wait) && wait > 0 ? ` Please wait ${Math.ceil(wait)} seconds and try again.` : " Please wait a moment and try again.";
+    throw new MultiplayerRequestError(`You're doing that too quickly.${suffix}`, 429, data);
+  }
   if (!response.ok) throw new MultiplayerRequestError(typeof data.error === "string" ? data.error : "Multiplayer request failed.", response.status, data);
   return data as T;
 }
@@ -145,6 +151,19 @@ export function MultiplayerLobby({ onBack }: { onBack: () => void }) {
     await perform(`/api/multiplayer/rooms/${room.code}/actions`, { version: room.version, requestId: crypto.randomUUID(), action });
   }
 
+  /** Leaving a running game forfeits the seat (RD-130): the server records it, then this device lets go of the seat. */
+  async function leaveActiveGame() {
+    if (!credentials || !room) return;
+    if (!isOnline) { setError("You are offline. Reconnect to leave the game."); return; }
+    try {
+      await request(`/api/multiplayer/rooms/${encodeURIComponent(credentials.code)}/forfeit`, { method: "POST", headers: { Authorization: `Bearer ${credentials.token}` }, body: JSON.stringify({}) });
+    } catch (e) {
+      // A room that is already gone or finished can simply be left; anything else keeps the seat so the player can retry.
+      if (!(e instanceof MultiplayerRequestError && (e.status === 404 || e.status === 409))) { setError(e instanceof Error ? e.message : "Could not leave the game."); return; }
+    }
+    await disconnect();
+  }
+
   async function disconnect() {
     if (credentials && room?.status === "waiting" && isOnline) {
       try {
@@ -182,12 +201,19 @@ export function MultiplayerLobby({ onBack }: { onBack: () => void }) {
       statusMessage={working ? "Synchronizing with the room…" : isMyTurn ? "Your seat is active. Actions are validated by the game server." : `Waiting for ${current.name} to complete their turn.`}
       canAct={isMyTurn && room.state.phase !== "game-over"}
       busy={working || !isOnline}
-      waitingNote="Waiting for the active player. This board updates automatically."
+      waitingNote={(() => {
+        const currentSeat = room.seats.find((item) => item.playerId === current.id);
+        if (currentSeat && room.status === "active" && isSeatAway(currentSeat, Date.now())) {
+          const missed = currentSeat.missedTurns ? ` (${currentSeat.missedTurns} of ${ABSENCE.forfeitAfterMisses} missed turns)` : "";
+          return `${current.name} appears to be away${missed}. The computer plays their turn if they don't return.`;
+        }
+        return "Waiting for the active player. This board updates automatically.";
+      })()}
       soundEnabled={soundEnabled}
       onToggleSound={() => setSoundEnabled((enabled) => !enabled)}
       feed={feed}
       actions={actions}
-      headerActions={<><button className="reset-button" onClick={() => void refresh()}>SYNC ↻</button><button className="reset-button" onClick={() => { if (room.status !== "active" || window.confirm("Leaving this device gives up your seat on it. Leave anyway?")) void disconnect(); }}>LEAVE ↗</button></>}
+      headerActions={<><button className="reset-button" onClick={() => void refresh()}>SYNC ↻</button><button className="reset-button" onClick={() => { if (room.status !== "active") void disconnect(); else if (window.confirm("Leaving forfeits your seat for good: your cash goes to the public treasury and your property returns to the market. Leave anyway?")) void leaveActiveGame(); }}>LEAVE ↗</button></>}
       banner={(!isOnline || error || staleSeats) ? <div className="game-banner">
         {!isOnline && <p className="multiplayer-error" role="status">Connection lost. Actions are paused until this device reconnects.</p>}
         {staleSeats && <p className="multiplayer-error" role="status">One or more players appear disconnected. Their seat is preserved; reconnecting restores their session.</p>}

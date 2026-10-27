@@ -8,5 +8,11 @@
       "source": "/api/analytics/:path*",
       "destination": "/api/analytics?path=:path*"
     }
+  ],
+  "crons": [
+    {
+      "path": "/api/maintenance",
+      "schedule": "17 3 * * *"
+    }
   ]
 }

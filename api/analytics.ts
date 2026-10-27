@@ -1,6 +1,7 @@
 import { createHash, timingSafeEqual } from "node:crypto";
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 import { parseGameSummary } from "../src/game/analyticsValidation.js";
+import { checkRateLimits, clientIp, RATE_RULES } from "../src/server/rateLimit.js";
 import { ensureAnalyticsTable, isValidGameId, readAnalytics, recordGameFinish, recordGameProgress, recordGameStart, type NeonSql } from "../src/server/analyticsStore.js";
 
 let neonModulePromise: Promise<typeof import("@neondatabase/serverless")> | undefined;
@@ -46,7 +47,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (isSummary) {
     const expected = process.env.ANALYTICS_ADMIN_TOKEN;
     if (!expected) return send(res, 503, { error: "Analytics reporting is not configured. ANALYTICS_ADMIN_TOKEN is missing." });
-    if (!isAdmin(req, expected)) return send(res, 401, { error: "A valid admin token is required." });
   }
   const connectionString = process.env.DATABASE_URL;
   if (!connectionString) return send(res, 503, { error: "Analytics storage is not configured. DATABASE_URL is missing." });
@@ -67,6 +67,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   try {
     const { neon } = await (neonModulePromise ??= import("@neondatabase/serverless"));
     const sql = neon(connectionString) as unknown as NeonSql;
+    const decision = await checkRateLimits(sql, clientIp(req.headers), isSummary ? RATE_RULES.adminAttempt : RATE_RULES.analyticsWrite, { salt: process.env.RATE_LIMIT_SALT });
+    if (!decision.allowed) {
+      res.setHeader("Retry-After", String(decision.retryAfterSeconds));
+      return send(res, 429, { error: "Too many requests. Please slow down.", retryAfterSeconds: decision.retryAfterSeconds });
+    }
+    if (isSummary && !isAdmin(req, process.env.ANALYTICS_ADMIN_TOKEN ?? "")) return send(res, 401, { error: "A valid admin token is required." });
     await ensureAnalyticsTable(sql);
     if (isProgress) {
       await recordGameProgress(sql, body.gameId as string, round as number);

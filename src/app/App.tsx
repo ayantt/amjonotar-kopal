@@ -6,6 +6,7 @@ import type { GameState, PlayerRole } from "../game/types";
 import { AnalyticsDashboard } from "./AnalyticsDashboard";
 import { GameScreen, type GameActions } from "./GameScreen";
 import { MultiplayerLobby } from "./MultiplayerLobby";
+import { clearSavedGame, loadSavedGame, writeSavedGame } from "./saveStorage";
 import { playSound } from "./sound";
 import { newGameId, trackGameFinish, trackGameProgress, trackGameStart } from "./telemetry";
 import { useEventFeed } from "./useEventFeed";
@@ -16,6 +17,10 @@ export function App() {
   const [game, setGame] = useState<GameState | null>(null);
   const [gameNumber, setGameNumber] = useState(0);
   const gameId = useRef<string | null>(null);
+  /** The resumable game found on this device (shown on the menu), if any. */
+  const [saved, setSaved] = useState(loadSavedGame);
+  const gameRef = useRef<GameState | null>(null);
+  gameRef.current = game;
   useEffect(() => {
     const syncRoute = () => setShowAnalytics(window.location.hash === "#/analytics");
     window.addEventListener("hashchange", syncRoute);
@@ -58,6 +63,19 @@ export function App() {
     trackGameProgress(gameId.current, round);
   }, [round]);
 
+  // Autosave shortly after every change, and immediately when the page is hidden or closed. A finished game clears the save.
+  useEffect(() => {
+    if (!game) return;
+    if (game.phase === "game-over") { clearSavedGame(); return; }
+    const timer = window.setTimeout(() => writeSavedGame(game, gameId.current), 300);
+    return () => window.clearTimeout(timer);
+  }, [game]);
+  useEffect(() => {
+    const flush = () => { if (gameRef.current) writeSavedGame(gameRef.current, gameId.current); };
+    window.addEventListener("pagehide", flush);
+    return () => window.removeEventListener("pagehide", flush);
+  }, []);
+
   const victory = game?.phase === "game-over";
   useEffect(() => {
     if (victory && game && gameId.current) {
@@ -74,6 +92,7 @@ export function App() {
     if (!validateSetup(next)) throw new Error("Invalid four-player setup.");
     setGame(next);
     setGameNumber((n) => n + 1);
+    setSaved(null);
     gameId.current = newGameId();
     lastProgressRound.current = 0;
     trackGameStart(gameId.current, role);
@@ -91,11 +110,39 @@ export function App() {
       setLastAction(error instanceof Error ? error.message : "That action is not available right now.");
     }
   }
-  function restart() {
+  function leaveToMenu() {
     if (document.fullscreenElement) void document.exitFullscreen();
+    // Flush first so the menu's "Resume" card reflects the very latest position.
+    if (game) writeSavedGame(game, gameId.current);
+    setGame(null);
+    setSaved(loadSavedGame());
+    setBusy(false);
+    setLastAction("Choose your role to start a new game.");
+  }
+  /** Abandons the current game for good (Restart / New game). An unfinished game asks first, since it would be lost. */
+  function restart() {
+    if (game && game.phase !== "game-over" && !window.confirm("Discard this game and start over? Your saved progress will be lost.")) return;
+    if (document.fullscreenElement) void document.exitFullscreen();
+    clearSavedGame();
+    setSaved(null);
     setGame(null);
     setBusy(false);
     setLastAction("Choose your role to start a new game.");
+  }
+  function resumeGame() {
+    if (!saved) return;
+    setGame(saved.game);
+    setGameNumber((n) => n + 1);
+    gameId.current = saved.gameId;
+    lastProgressRound.current = saved.game.round;
+    setSaved(null);
+    setBusy(false);
+    setLastAction("Game resumed. Welcome back.");
+    playSound("start", soundEnabled);
+  }
+  function discardSave() {
+    clearSavedGame();
+    setSaved(null);
   }
 
   const human = game?.players.find((player) => player.controller === "human");
@@ -137,6 +184,15 @@ export function App() {
       <h1>আমজনতার<br /><em>কপাল।</em></h1>
       <p className="lede">The people pay. The powerful play.</p>
       <p className="intro">A crooked little property game about big promises, public money, and who gets to make the rules. Choose your seat. Three computer opponents will take the others.</p>
+      {saved && (() => {
+        const you = saved.game.players.find((player) => player.controller === "human");
+        const minutes = Math.max(0, Math.round((Date.now() - Date.parse(saved.savedAt)) / 60_000));
+        const ago = minutes < 1 ? "just now" : minutes < 60 ? `${minutes} min ago` : minutes < 1440 ? `${Math.round(minutes / 60)} h ago` : `${Math.round(minutes / 1440)} d ago`;
+        return <div className="resume-card">
+          <div><span className="role-number">SAVED GAME</span><strong>Resume your game</strong><span>{you ? `${roleName(you.role)} · ৳${you.cash.toLocaleString("en-BD")} · round ${saved.game.round}` : `Round ${saved.game.round}`} · saved {ago}</span></div>
+          <div className="resume-actions"><button className="primary-action" onClick={resumeGame}>RESUME ↗</button><button className="secondary-action" onClick={discardSave}>DISCARD</button></div>
+        </div>;
+      })()}
       <div className="role-picks">
         <button className="role-card politician-card" onClick={() => startGame("politician")}><span className="role-number">01 / POWER</span><strong>Play as Politician</strong><span>Two dice. Special privileges. Keep the system on your side.</span><span className="button-copy">TAKE THE CHAIR ↗</span></button>
         <button className="role-card citizen-card" onClick={() => startGame("citizen")}><span className="role-number">02 / PEOPLE</span><strong>Play as Citizen</strong><span>One die. Three citizens. Your best chance is to work together.</span><span className="button-copy">JOIN THE PUBLIC ↗</span></button>
@@ -152,7 +208,7 @@ export function App() {
     viewerId={human?.id ?? current.id}
     online={false}
     wordmarkNote="BACK TO MENU"
-    onWordmark={restart}
+    onWordmark={leaveToMenu}
     turnLabel={current.controller === "human" ? "YOUR TURN" : "COMPUTER TURN"}
     statusMessage={busy ? "The computer is making its move…" : lastAction}
     canAct={isHumanTurn(game) && game.phase !== "game-over"}
