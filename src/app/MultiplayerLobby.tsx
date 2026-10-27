@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { GameState } from "../game/types";
 import { GameScreen, type GameActions } from "./GameScreen";
+import { loadPlayerName, savePlayerName } from "./playerName";
 import { useEventFeed } from "./useEventFeed";
 
 type PublicSeat = { playerId: string; name: string; role: "politician" | "citizen" | null; joinedAt: string; lastSeenAt?: string };
@@ -17,7 +18,7 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   return data as T;
 }
 export function MultiplayerLobby({ onBack }: { onBack: () => void }) {
-  const [name, setName] = useState("");
+  const [name, setName] = useState(loadPlayerName);
   const [joinCode, setJoinCode] = useState("");
   const [credentials, setCredentials] = useState<Credentials | null>(() => {
     try { const value = localStorage.getItem(storageKey); return value ? JSON.parse(value) as Credentials : null; } catch { return null; }
@@ -89,7 +90,7 @@ export function MultiplayerLobby({ onBack }: { onBack: () => void }) {
     try {
       const result = await request<{ room: Room; playerId: string; token: string }>("/api/multiplayer/rooms", { method: "POST", body: JSON.stringify({ name }) });
       const next = { code: result.room.code, playerId: result.playerId, token: result.token };
-      saveCredentials(next); setRoom(result.room); setNotice("Room created. Invite at least one and up to five other players.");
+      savePlayerName(name); saveCredentials(next); setRoom(result.room); setNotice("Room created. Invite at least one and up to five other players.");
     } catch (e) { setError(e instanceof Error ? e.message : "Could not create room."); }
     finally { workingRef.current = false; setWorking(false); }
   }
@@ -101,7 +102,7 @@ export function MultiplayerLobby({ onBack }: { onBack: () => void }) {
     const code = joinCode.trim().toUpperCase();
     try {
       const result = await request<{ room: Room; playerId: string; token: string }>(`/api/multiplayer/rooms/${encodeURIComponent(code)}/join`, { method: "POST", body: JSON.stringify({ name }) });
-      saveCredentials({ code: result.room.code, playerId: result.playerId, token: result.token });
+      savePlayerName(name); saveCredentials({ code: result.room.code, playerId: result.playerId, token: result.token });
       setRoom(result.room); setNotice("You joined the room. Wait for the host to start the game.");
     } catch (e) { setError(e instanceof Error ? e.message : "Could not join room."); }
     finally { workingRef.current = false; setWorking(false); }
