@@ -26,6 +26,16 @@ Attach your own video, image/GIF or audio to game events. When the event pops up
 
 Each entry may have `video`, `image` (also a poster for a video), `audio`, `caption` (shown under the clip and read by screen readers; max 200 characters) and `maxSeconds` (longest the popup stays open; default 20 for video, 5 otherwise; hard cap 60). A video closes the popup when it ends. The player can always press DISMISS.
 
+## Different clips for Politician and Citizen
+Add `@politician` or `@citizen` to any key to play different media depending on the role of the player the event is about (the one who landed, drew the card, bought, went bankrupt, forfeited, or won). Everyone watching sees the same clip, because it follows the event, not the viewer.
+
+```json
+"space:income-tax@politician": { "image": "/media/events/space-income-tax-politician.gif", "caption": "Happy politician" },
+"space:income-tax@citizen":    { "video": "/media/events/income-tax-sad.mp4", "caption": "Sad citizen" },
+"space:income-tax":            { "image": "/media/events/space-income-tax.gif" }
+```
+Lookup order: exact key with the role, exact key without it, then the same two for the kind of space (`type:tax@citizen`, `type:tax`) or for any card (`card@politician`, `card`). An entry with only one role plays for that role only. Samples are included for Income Tax and Development Levy (`luxury-tax`).
+
 ## Which key plays when
 The most specific key wins: exact key, then the fallback.
 

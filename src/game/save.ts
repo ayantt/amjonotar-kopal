@@ -58,7 +58,7 @@ export function isValidSavedGame(value: unknown): value is GameState {
   if (!isRecord(value.cardDrawCounts) || !isInt(value.cardDrawCounts.community, 0, 1_000_000) || !isInt(value.cardDrawCounts.chance, 0, 1_000_000)) return false;
   if (typeof value.extraRollAvailable !== "boolean" || value.winner !== null) return false;
   if (!Array.isArray(value.events) || value.events.length > 200 || !isInt(value.nextEventId, 1, 10_000_000)) return false;
-  return value.events.every((event) => isRecord(event) && isInt(event.id, 0, 10_000_000) && typeof event.message === "string" && event.message.length < 600 && EVENT_KINDS.includes(String(event.kind)) && (event.key === undefined || (typeof event.key === "string" && event.key.length <= 64)));
+  return value.events.every((event) => isRecord(event) && isInt(event.id, 0, 10_000_000) && typeof event.message === "string" && event.message.length < 600 && EVENT_KINDS.includes(String(event.kind)) && (event.key === undefined || (typeof event.key === "string" && event.key.length <= 64)) && (event.role === undefined || event.role === "politician" || event.role === "citizen"));
 }
 
 const STATS_KEYS = ["flow", "landings", "rentBySpace", "cardDraws", "decisions", "builds", "bankruptcies", "cashHistory"] as const;
