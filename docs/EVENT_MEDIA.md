@@ -2,6 +2,9 @@
 
 Attach your own video, image/GIF or audio to game events. When the event pops up, the clip plays in the popup, for every player (online games share one event log, so everyone sees the same clip). Events without media keep the normal text popup.
 
+## Sample placeholders
+`src/app/eventMedia.json` already has a line for every event, each pointing at a labelled SAMPLE GIF in `public/media/events/` (for example `space-income-tax.gif`). To use your own content, replace the file keeping the same name, or change the path in the JSON (you can switch an entry to `video` or `audio`). Delete an entry to go back to the plain text popup. Landing on a Chance or Community space plays the card's entry (`card:CH-01` ...), not a `space:` entry, so those spaces have no `space:` line. A test checks that every entry uses a real key and that its file exists.
+
 ## How to add a clip
 1. Copy the file into `public/media/events/` (file names: letters, digits, `.`, `_`, `-`).
 2. Add an entry to `src/app/eventMedia.json` under `"events"`:

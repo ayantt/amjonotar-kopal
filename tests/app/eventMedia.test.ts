@@ -1,5 +1,8 @@
+import { existsSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { popupDurationMs, resolveEventMedia, type EventMediaManifest } from "../../src/app/eventMedia";
+import { BOARD } from "../../src/game/board";
+import { CARD_DECKS } from "../../src/game/cards";
+import { EVENT_MEDIA, popupDurationMs, resolveEventMedia, type EventMediaManifest } from "../../src/app/eventMedia";
 
 const manifest: EventMediaManifest = {
   "space:income-tax": { video: "/media/events/income-tax.mp4", caption: "Taxman cometh", maxSeconds: 8 },
@@ -41,5 +44,24 @@ describe("popupDurationMs", () => {
     expect(popupDurationMs({ image: "/media/events/a.png" })).toBe(5000);
     expect(popupDurationMs({ video: "/media/events/a.mp4" })).toBe(20000);
     expect(popupDurationMs({ video: "/media/events/a.mp4", maxSeconds: 8 })).toBe(8000);
+  });
+});
+
+describe("the shipped media manifest", () => {
+  const generic = ["pass-go", "buy", "build", "bankrupt", "forfeit", "game-over", "card"];
+  const validKey = (key: string) =>
+    generic.includes(key) ||
+    (key.startsWith("space:") && BOARD.some((space) => space.id === key.slice(6))) ||
+    (key.startsWith("type:") && BOARD.some((space) => space.type === key.slice(5))) ||
+    (key.startsWith("card:") && [...CARD_DECKS.community, ...CARD_DECKS.chance].some((card) => card.id === key.slice(5)));
+
+  it("only uses keys the game can actually produce", () => {
+    expect(Object.keys(EVENT_MEDIA).filter((key) => !validKey(key))).toEqual([]);
+  });
+  it("points every entry at a file that exists and passes the path checks", () => {
+    for (const [key, entry] of Object.entries(EVENT_MEDIA)) {
+      expect(resolveEventMedia(key), key).not.toBeNull();
+      for (const path of [entry.video, entry.image, entry.audio]) if (path) expect(existsSync(`public${path}`), `${key}: ${path}`).toBe(true);
+    }
   });
 });

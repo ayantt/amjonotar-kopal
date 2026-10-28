@@ -1,4 +1,293 @@
 {
-  "_help": "Maps an event key to media. Files live in public/media/events/ and are referenced as /media/events/<file>. See docs/EVENT_MEDIA.md for all keys. Entries are optional: events without media keep the normal popup.",
-  "events": {}
+  "_help": "Maps an event key to media. Files live in public/media/events/ and are referenced as /media/events/<file>. Each entry below points at a SAMPLE placeholder GIF: replace the file (keep the name) or change the path. You can also use \"video\" or \"audio\". Delete an entry to go back to the plain text popup. Card spaces (chance and community) use the card keys. See docs/EVENT_MEDIA.md.",
+  "events": {
+    "space:go": {
+      "image": "/media/events/space-go.gif",
+      "caption": "Shurur Line"
+    },
+    "space:old-dhaka": {
+      "image": "/media/events/space-old-dhaka.gif",
+      "caption": "Purono Dhaka"
+    },
+    "space:lalbagh": {
+      "image": "/media/events/space-lalbagh.gif",
+      "caption": "Lalbagh"
+    },
+    "space:income-tax": {
+      "image": "/media/events/space-income-tax.gif",
+      "caption": "Income Tax"
+    },
+    "space:rail-1": {
+      "image": "/media/events/space-rail-1.gif",
+      "caption": "Metro Rail"
+    },
+    "space:sadarghat": {
+      "image": "/media/events/space-sadarghat.gif",
+      "caption": "Sadarghat"
+    },
+    "space:buriganga": {
+      "image": "/media/events/space-buriganga.gif",
+      "caption": "Buriganga Ghat"
+    },
+    "space:shakhari": {
+      "image": "/media/events/space-shakhari.gif",
+      "caption": "Shakhari Bazar"
+    },
+    "space:jail": {
+      "image": "/media/events/space-jail.gif",
+      "caption": "Administrative Hold"
+    },
+    "space:gazipur": {
+      "image": "/media/events/space-gazipur.gif",
+      "caption": "Gazipur"
+    },
+    "space:electric": {
+      "image": "/media/events/space-electric.gif",
+      "caption": "Power Board"
+    },
+    "space:munshiganj": {
+      "image": "/media/events/space-munshiganj.gif",
+      "caption": "Munshiganj"
+    },
+    "space:tongi": {
+      "image": "/media/events/space-tongi.gif",
+      "caption": "Tongi"
+    },
+    "space:rail-2": {
+      "image": "/media/events/space-rail-2.gif",
+      "caption": "National Express"
+    },
+    "space:rajshahi": {
+      "image": "/media/events/space-rajshahi.gif",
+      "caption": "Rajshahi"
+    },
+    "space:bogura": {
+      "image": "/media/events/space-bogura.gif",
+      "caption": "Bogura"
+    },
+    "space:pabna": {
+      "image": "/media/events/space-pabna.gif",
+      "caption": "Pabna"
+    },
+    "space:free-parking": {
+      "image": "/media/events/space-free-parking.gif",
+      "caption": "Public Plaza"
+    },
+    "space:khulna": {
+      "image": "/media/events/space-khulna.gif",
+      "caption": "Khulna"
+    },
+    "space:jashore": {
+      "image": "/media/events/space-jashore.gif",
+      "caption": "Jashore"
+    },
+    "space:kushtia": {
+      "image": "/media/events/space-kushtia.gif",
+      "caption": "Kushtia"
+    },
+    "space:rail-3": {
+      "image": "/media/events/space-rail-3.gif",
+      "caption": "Padma Connector"
+    },
+    "space:sylhet": {
+      "image": "/media/events/space-sylhet.gif",
+      "caption": "Sylhet"
+    },
+    "space:moulvibazar": {
+      "image": "/media/events/space-moulvibazar.gif",
+      "caption": "Moulvibazar"
+    },
+    "space:water": {
+      "image": "/media/events/space-water.gif",
+      "caption": "Water Authority"
+    },
+    "space:habiganj": {
+      "image": "/media/events/space-habiganj.gif",
+      "caption": "Habiganj"
+    },
+    "space:go-to-jail": {
+      "image": "/media/events/space-go-to-jail.gif",
+      "caption": "Investigation Notice"
+    },
+    "space:chattogram": {
+      "image": "/media/events/space-chattogram.gif",
+      "caption": "Chattogram"
+    },
+    "space:cumilla": {
+      "image": "/media/events/space-cumilla.gif",
+      "caption": "Cumilla"
+    },
+    "space:cox-bazar": {
+      "image": "/media/events/space-cox-bazar.gif",
+      "caption": "Cox's Bazar"
+    },
+    "space:rail-4": {
+      "image": "/media/events/space-rail-4.gif",
+      "caption": "Coastal Line"
+    },
+    "space:gaibandha": {
+      "image": "/media/events/space-gaibandha.gif",
+      "caption": "Gaibandha"
+    },
+    "space:luxury-tax": {
+      "image": "/media/events/space-luxury-tax.gif",
+      "caption": "Development Levy"
+    },
+    "space:dhaka-heights": {
+      "image": "/media/events/space-dhaka-heights.gif",
+      "caption": "Dhaka Heights"
+    },
+    "card:CC-01": {
+      "image": "/media/events/card-cc-01.gif",
+      "caption": "CC-01 Government Allowance"
+    },
+    "card:CC-02": {
+      "image": "/media/events/card-cc-02.gif",
+      "caption": "CC-02 Public Service Bill"
+    },
+    "card:CC-03": {
+      "image": "/media/events/card-cc-03.gif",
+      "caption": "CC-03 Public Benefit"
+    },
+    "card:CC-04": {
+      "image": "/media/events/card-cc-04.gif",
+      "caption": "CC-04 Road Repair Levy"
+    },
+    "card:CC-05": {
+      "image": "/media/events/card-cc-05.gif",
+      "caption": "CC-05 Unexpected Medical Expense"
+    },
+    "card:CC-06": {
+      "image": "/media/events/card-cc-06.gif",
+      "caption": "CC-06 Community Donation"
+    },
+    "card:CC-07": {
+      "image": "/media/events/card-cc-07.gif",
+      "caption": "CC-07 Paperwork Correction"
+    },
+    "card:CC-08": {
+      "image": "/media/events/card-cc-08.gif",
+      "caption": "CC-08 Delayed Salary"
+    },
+    "card:CC-09": {
+      "image": "/media/events/card-cc-09.gif",
+      "caption": "CC-09 Transport Subsidy"
+    },
+    "card:CC-10": {
+      "image": "/media/events/card-cc-10.gif",
+      "caption": "CC-10 Maintenance Notice"
+    },
+    "card:CC-11": {
+      "image": "/media/events/card-cc-11.gif",
+      "caption": "CC-11 School Fundraiser"
+    },
+    "card:CC-12": {
+      "image": "/media/events/card-cc-12.gif",
+      "caption": "CC-12 Electricity Adjustment"
+    },
+    "card:CC-13": {
+      "image": "/media/events/card-cc-13.gif",
+      "caption": "CC-13 Audit"
+    },
+    "card:CC-14": {
+      "image": "/media/events/card-cc-14.gif",
+      "caption": "CC-14 Public Contract"
+    },
+    "card:CC-15": {
+      "image": "/media/events/card-cc-15.gif",
+      "caption": "CC-15 Neighbour Helps Neighbour"
+    },
+    "card:CC-16": {
+      "image": "/media/events/card-cc-16.gif",
+      "caption": "CC-16 People's Meeting"
+    },
+    "card:CH-01": {
+      "image": "/media/events/card-ch-01.gif",
+      "caption": "CH-01 Price Hike"
+    },
+    "card:CH-02": {
+      "image": "/media/events/card-ch-02.gif",
+      "caption": "CH-02 Investigation Notice"
+    },
+    "card:CH-03": {
+      "image": "/media/events/card-ch-03.gif",
+      "caption": "CH-03 Tax Rebate"
+    },
+    "card:CH-04": {
+      "image": "/media/events/card-ch-04.gif",
+      "caption": "CH-04 Road Diversion"
+    },
+    "card:CH-05": {
+      "image": "/media/events/card-ch-05.gif",
+      "caption": "CH-05 Development Project"
+    },
+    "card:CH-06": {
+      "image": "/media/events/card-ch-06.gif",
+      "caption": "CH-06 Public Holiday"
+    },
+    "card:CH-07": {
+      "image": "/media/events/card-ch-07.gif",
+      "caption": "CH-07 Broken Water Line"
+    },
+    "card:CH-08": {
+      "image": "/media/events/card-ch-08.gif",
+      "caption": "CH-08 Permit Required"
+    },
+    "card:CH-09": {
+      "image": "/media/events/card-ch-09.gif",
+      "caption": "CH-09 Transport Strike"
+    },
+    "card:CH-10": {
+      "image": "/media/events/card-ch-10.gif",
+      "caption": "CH-10 Favourable Headline"
+    },
+    "card:CH-11": {
+      "image": "/media/events/card-ch-11.gif",
+      "caption": "CH-11 Community Service"
+    },
+    "card:CH-12": {
+      "image": "/media/events/card-ch-12.gif",
+      "caption": "CH-12 Court Date"
+    },
+    "card:CH-13": {
+      "image": "/media/events/card-ch-13.gif",
+      "caption": "CH-13 Contract Award"
+    },
+    "card:CH-14": {
+      "image": "/media/events/card-ch-14.gif",
+      "caption": "CH-14 Inflation Adjustment"
+    },
+    "card:CH-15": {
+      "image": "/media/events/card-ch-15.gif",
+      "caption": "CH-15 Public Apology"
+    },
+    "card:CH-16": {
+      "image": "/media/events/card-ch-16.gif",
+      "caption": "CH-16 Collective Action"
+    },
+    "pass-go": {
+      "image": "/media/events/pass-go.gif",
+      "caption": "Passing Go"
+    },
+    "buy": {
+      "image": "/media/events/buy.gif",
+      "caption": "Buying a property"
+    },
+    "build": {
+      "image": "/media/events/build.gif",
+      "caption": "Building a house or hotel"
+    },
+    "bankrupt": {
+      "image": "/media/events/bankrupt.gif",
+      "caption": "Bankruptcy"
+    },
+    "forfeit": {
+      "image": "/media/events/forfeit.gif",
+      "caption": "A player forfeits"
+    },
+    "game-over": {
+      "image": "/media/events/game-over.gif",
+      "caption": "Game over"
+    }
+  }
 }
