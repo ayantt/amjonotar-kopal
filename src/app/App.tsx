@@ -1,15 +1,18 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { BOARD } from "../game/board";
 import { buildProperty, buyCooperativeProperty, contributeToCooperative, createNewGame, endTurn, getCurrentPlayer, isHumanTurn, mortgageProperty, redeemMortgage, resolvePropertyAction, rollAndMove, sellProperty, validateSetup } from "../game/engine";
 import { runAiTurn } from "../game/turns";
 import type { GameState, PlayerRole } from "../game/types";
-import { AnalyticsDashboard } from "./AnalyticsDashboard";
 import { GameScreen, type GameActions } from "./GameScreen";
-import { MultiplayerLobby } from "./MultiplayerLobby";
 import { clearSavedGame, loadSavedGame, writeSavedGame } from "./saveStorage";
 import { playSound } from "./sound";
 import { markGameFinished, newGameId, trackGameFinish, trackGameProgress, trackGameStart, trackLobbyOpen, trackReplayIfAny, trackVisit } from "./telemetry";
 import { useEventFeed } from "./useEventFeed";
+
+// The menu is what everyone sees first, so the admin dashboard and the online lobby download only when opened.
+const AnalyticsDashboard = lazy(() => import("./AnalyticsDashboard").then((module) => ({ default: module.AnalyticsDashboard })));
+const MultiplayerLobby = lazy(() => import("./MultiplayerLobby").then((module) => ({ default: module.MultiplayerLobby })));
+const loadingScreen = <main className="app-shell" aria-busy="true"><p className="eyebrow" role="status">Loading…</p></main>;
 
 const roleName = (role: PlayerRole) => role === "politician" ? "Politician" : "Citizen";
 
@@ -178,8 +181,8 @@ export function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }), [game, soundEnabled]);
 
-  if (showAnalytics) return <AnalyticsDashboard onBack={() => { window.location.hash = ""; setShowAnalytics(false); }} />;
-  if (!game && showMultiplayer) return <MultiplayerLobby onBack={() => setShowMultiplayer(false)} />;
+  if (showAnalytics) return <Suspense fallback={loadingScreen}><AnalyticsDashboard onBack={() => { window.location.hash = ""; setShowAnalytics(false); }} /></Suspense>;
+  if (!game && showMultiplayer) return <Suspense fallback={loadingScreen}><MultiplayerLobby onBack={() => setShowMultiplayer(false)} /></Suspense>;
 
   if (!game) return <main className="app-shell">
     <header className="masthead"><img className="seal" src="/favicon.svg" alt="" width={34} height={34} /><span>PiFLUX POLITICS CLUB</span><span className="masthead-right">BOARD GAME NO. 01</span></header>
