@@ -1,0 +1,4 @@
+{
+  "_help": "Maps an event key to media. Files live in public/media/events/ and are referenced as /media/events/<file>. See docs/EVENT_MEDIA.md for all keys. Entries are optional: events without media keep the normal popup.",
+  "events": {}
+}

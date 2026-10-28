@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import type { GameState } from "../game/types";
 import { playSound } from "./sound";
+import { popupDurationMs, resolveEventMedia, type EventMedia } from "./eventMedia";
 
 type FeedEvent = GameState["events"][number];
 
@@ -8,6 +9,8 @@ export type EventFeed = {
   /** Events revealed so far; lags behind `events` while popups play so the log matches what the player has seen. */
   displayedEvents: FeedEvent[];
   activeEvent: FeedEvent | null;
+  /** Event-specific media (video, image or audio) for the active popup, if any is configured. */
+  activeMedia: EventMedia | null;
   popupsEnabled: boolean;
   /** True while queued popups are still being shown (AI turns wait for this). */
   isPlaying: boolean;
@@ -66,15 +69,18 @@ export function useEventFeed(events: FeedEvent[], soundEnabled: boolean, resetKe
 
   useEffect(() => {
     if (!activeEvent || !popupsEnabled) return;
-    playSound(activeEvent.kind === "money" ? "money" : activeEvent.kind === "ai" ? "event" : "turn", soundEnabled);
+    const media = resolveEventMedia(activeEvent.key);
+    // Event media brings its own sound, so the generic chime only plays for ordinary popups.
+    if (!media) playSound(activeEvent.kind === "money" ? "money" : activeEvent.kind === "ai" ? "event" : "turn", soundEnabled);
     setDisplayedEvents((shown) => shown.some((event) => event.id === activeEvent.id) ? shown : [...shown, activeEvent]);
-    const timer = window.setTimeout(() => setActiveEvent(null), 2600);
+    const timer = window.setTimeout(() => setActiveEvent(null), popupDurationMs(media));
     return () => window.clearTimeout(timer);
   }, [activeEvent, popupsEnabled, soundEnabled]);
 
   return {
     displayedEvents,
     activeEvent,
+    activeMedia: activeEvent ? resolveEventMedia(activeEvent.key) : null,
     popupsEnabled,
     isPlaying: Boolean(activeEvent) || queue.length > 0,
     togglePopups: () => {

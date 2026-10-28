@@ -130,6 +130,8 @@ export function GameScreen(props: GameScreenProps) {
         isFullscreen={isFullscreen}
         showEventPopup={feed.popupsEnabled}
         activeEvent={feed.activeEvent}
+        activeMedia={feed.activeMedia}
+        soundEnabled={props.soundEnabled}
         onSelectProperty={setSelectedPropertyId}
         onToggleFullscreen={() => void toggleFullscreen()}
         onDismissEvent={feed.dismiss}

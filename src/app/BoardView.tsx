@@ -1,5 +1,7 @@
 import { BOARD } from "../game/board";
 import type { GameState } from "../game/types";
+import { EventMediaView } from "./EventMediaView";
+import type { EventMedia } from "./eventMedia";
 
 type ActiveEvent = { id: number; message: string; kind: string };
 type Player = GameState["players"][number];
@@ -10,6 +12,9 @@ type BoardViewProps = {
   isFullscreen: boolean;
   showEventPopup: boolean;
   activeEvent: ActiveEvent | null;
+  /** Media configured for the active event, if any. */
+  activeMedia?: EventMedia | null;
+  soundEnabled?: boolean;
   onSelectProperty: (spaceId: string) => void;
   onToggleFullscreen: () => void;
   onDismissEvent: () => void;
@@ -27,6 +32,8 @@ export function BoardView({
   isFullscreen,
   showEventPopup,
   activeEvent,
+  activeMedia = null,
+  soundEnabled = false,
   onSelectProperty,
   onToggleFullscreen,
   onDismissEvent,
@@ -61,8 +68,9 @@ export function BoardView({
         <div className="center-status">{current.name} · {roleName(current.role)} · {money(current.cash)}</div>
       </div>
     </div>
-    {showEventPopup && activeEvent && <div className={`board-event-popup event-popup-${activeEvent.kind}`} role="status" aria-live="polite" key={activeEvent.id}>
+    {showEventPopup && activeEvent && <div className={`board-event-popup event-popup-${activeEvent.kind}${activeMedia ? " has-media" : ""}`} role="status" aria-live="polite" key={activeEvent.id}>
       <span className="board-event-kicker">OFFICIAL RECORD · EVENT {String(activeEvent.id).padStart(3, "0")}</span>
+      {activeMedia && <EventMediaView key={activeEvent.id} media={activeMedia} soundEnabled={soundEnabled} onFinished={onDismissEvent} />}
       <p>{activeEvent.message}</p>
       <button type="button" aria-label="Dismiss event" onClick={onDismissEvent}>DISMISS ×</button>
     </div>}
