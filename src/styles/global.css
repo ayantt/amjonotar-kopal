@@ -314,3 +314,10 @@
 @media (prefers-reduced-motion:reduce){
   *,*::before,*::after{animation-duration:.001ms!important;animation-iteration-count:1!important;transition-duration:.001ms!important;scroll-behavior:auto!important}
 }
+
+/* Event media inside the popup. */
+.board-event-popup.has-media{position:fixed;width:min(560px,92vw);max-height:92vh;overflow-y:auto}
+.event-media{position:relative;margin:0 0 .9rem}
+.event-media-video,.event-media-image{display:block;width:100%;max-height:min(32vh,240px);object-fit:contain;background:#20241e;border:1px solid #9d8c6d}
+.event-media figcaption{margin-top:.4rem;font-size:.68rem;letter-spacing:.06em;color:#51483a}
+

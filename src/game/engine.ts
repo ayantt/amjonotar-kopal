@@ -6,8 +6,8 @@ import { recordBankruptcy, recordBuild, recordCard, recordCashSnapshot, recordDe
 import type { Controller, GameEvent, GameState, NewGameOptions, Player, PlayerRole } from "./types.js";
 
 const defaultRandom = () => Math.random();
-function addEvent(state: GameState, message: string, kind: GameEvent["kind"] = "system"): GameState {
-  return { ...state, nextEventId: state.nextEventId + 1, events: [...state.events, { id: state.nextEventId, message, kind }].slice(-100) };
+function addEvent(state: GameState, message: string, kind: GameEvent["kind"] = "system", key?: string): GameState {
+  return { ...state, nextEventId: state.nextEventId + 1, events: [...state.events, { id: state.nextEventId, message, kind, ...(key ? { key } : {}) }].slice(-100) };
 }
 /** Last-player-standing rule: the game ends when exactly one player is not bankrupt, and that player wins. */
 function checkVictory(state: GameState): GameState {
@@ -16,7 +16,7 @@ function checkVictory(state: GameState): GameState {
   if (survivors.length !== 1) return state;
   const winner = survivors[0];
   const who = winner.name === "You" ? "You win" : `${winner.name} wins`;
-  return addEvent({ ...state, phase: "game-over", winner: winner.id, pendingPropertyId: null }, `${who} as the last player standing (${winner.role === "politician" ? "Politician" : "Citizen"}): every other player is bankrupt.`);
+  return addEvent({ ...state, phase: "game-over", winner: winner.id, pendingPropertyId: null }, `${who} as the last player standing (${winner.role === "politician" ? "Politician" : "Citizen"}): every other player is bankrupt.`, "system", "game-over");
 }
 function makePlayer(id: string, name: string, role: PlayerRole, controller: Controller): Player {
   return { id, name, role, controller, cash: role === "politician" ? GAME_RULES.politicianStartingCash : GAME_RULES.citizenStartingCash, position: 0, active: true, lastRoll: [], goPasses: 0, bankrupt: false, skipTurns: 0 };
@@ -126,7 +126,7 @@ function pay(state: GameState, payerId: string, recipientId: string | null, amou
         ? [id, { ...property, ownerId: heirId, leaseholderId: null, leaseExpiresAtGoPass: null, mortgaged: false, ...(heirId ? {} : { houses: 0, hotel: false }) }]
         : property.leaseholderId === payerId ? [id, { ...property, leaseholderId: null, leaseExpiresAtGoPass: null }] : [id, property])) };
     next = recordBankruptcy(next, payerId, tag.category);
-    next = addEvent(next, `${payer.name} could not pay the remaining ৳${remaining} and went bankrupt. Assets were transferred under the current bankruptcy rule.`);
+    next = addEvent(next, `${payer.name} could not pay the remaining ৳${remaining} and went bankrupt. Assets were transferred under the current bankruptcy rule.`, "system", "bankrupt");
     next = checkVictory(next);
   }
   return next;
@@ -265,14 +265,23 @@ function resolveCard(state: GameState, playerId: string, deck: "community" | "ch
   const card = drawCard(deck, index);
   let next: GameState = { ...state, cardDrawCounts: { ...state.cardDrawCounts, [deck]: index + 1 } };
   next = recordCard(next, card.id, player.role);
-  next = addEvent(next, `${player.name} drew ${card.id}: ${card.title}.`);
+  next = addEvent(next, `${player.name} drew ${card.id}: ${card.title}.`, "system", `card:${card.id}`);
   for (const effect of card.effects[player.role]) {
     next = applyCardEffect(next, playerId, effect, depth);
     if (next.phase === "game-over" || next.players.find((p) => p.id === playerId)?.bankrupt) break;
   }
   return next;
 }
+/** Resolves a landing and labels the first event it produced `space:<id>` (unless a more specific key, such as a card, is already set). */
 function resolveLanding(state: GameState, playerId: string, depth = 0): GameState {
+  const player = state.players.find((p) => p.id === playerId);
+  const firstId = state.nextEventId;
+  const next = resolveLandingInner(state, playerId, depth);
+  if (!player || next === state) return next;
+  const spaceKey = `space:${BOARD[player.position].id}`;
+  return { ...next, events: next.events.map((event) => event.id === firstId && !event.key ? { ...event, key: spaceKey } : event) };
+}
+function resolveLandingInner(state: GameState, playerId: string, depth = 0): GameState {
   const player = state.players.find((p) => p.id === playerId);
   if (!player) return state;
   const space = BOARD[player.position];
@@ -334,7 +343,7 @@ export function movePlayer(state: GameState, playerId: string, steps: number): G
     }
   }
   next = addEvent(next, `${player.name} moved ${steps} spaces to ${BOARD[newPosition].name}.`, "movement");
-  if (crossedGoCount) next = addEvent(next, `${player.name} collected ৳${reward * crossedGoCount} for passing Shurur Line.`, "money");
+  if (crossedGoCount) next = addEvent(next, `${player.name} collected ৳${reward * crossedGoCount} for passing Shurur Line.`, "money", "pass-go");
   if (exactGo) next = addEvent(next, `${player.name} landed exactly on Shurur Line and received an extra ৳${exactBonus}.`, "money");
   if (crossedGoCount > 0 && player.role === "citizen") {
     const developed = Object.values(next.properties).filter((property) => property.ownerId === player.id && ((property.houses ?? 0) > 0 || property.hotel));
@@ -370,7 +379,7 @@ export function resolvePropertyAction(state: GameState, action: PropertyAction):
   if (action === "buy") {
     next = { ...state, players: state.players.map((p) => p.id === player.id ? { ...p, cash: p.cash - selected.cost } : p),
       properties: { ...state.properties, [space.id]: { ...state.properties[space.id], ownerId: player.id } }, pendingPropertyId: null };
-    next = addEvent(next, `${player.name} bought ${space.name} for ৳${selected.cost}.`, "money");
+    next = addEvent(next, `${player.name} bought ${space.name} for ৳${selected.cost}.`, "money", "buy");
   } else if (action === "lease") {
     const duration = player.role === "politician" ? null : player.goPasses + 5;
     next = { ...state, players: state.players.map((p) => p.id === player.id ? { ...p, cash: p.cash - selected.cost } : p),
@@ -417,7 +426,7 @@ export function buildProperty(state: GameState, playerId: string, spaceId: strin
   if (cost <= 0 || player.cash < cost) throw new Error("Not enough cash for this building.");
   const updated = action === "house" ? { ...property, houses: houses + 1, hotel: false } : { ...property, houses: 0, hotel: true };
   const next: GameState = { ...state, players: state.players.map((item) => item.id === playerId ? { ...item, cash: item.cash - cost } : item), properties: { ...state.properties, [spaceId]: updated } };
-  return checkVictory(addEvent(recordBuild(recordFlow(next, playerId, "out", "building", cost), player.role), player.name + " built " + (action === "hotel" ? "a hotel" : "a house") + " on " + space.name + " for ৳" + cost + ". Rent multiplier is now " + getBuildingRentMultiplier(updated) + "×.", "money"));
+  return checkVictory(addEvent(recordBuild(recordFlow(next, playerId, "out", "building", cost), player.role), player.name + " built " + (action === "hotel" ? "a hotel" : "a house") + " on " + space.name + " for ৳" + cost + ". Rent multiplier is now " + getBuildingRentMultiplier(updated) + "×.", "money", "build"));
 }
 
 export interface LegalBuildAction { spaceId: string; action: BuildingAction; cost: number; rentGain: number; }
@@ -607,7 +616,7 @@ export function forfeitPlayer(state: GameState, playerId: string, reason: Forfei
   next = recordForfeit(next, playerId, reason);
   next = addEvent(next, reason === "absent"
     ? `${player.name} was away for too many turns and forfeited. Their cash went to the public treasury and their property returned to the market.`
-    : `${player.name} left the game and forfeited. Their cash went to the public treasury and their property returned to the market.`);
+    : `${player.name} left the game and forfeited. Their cash went to the public treasury and their property returned to the market.`, "system", "forfeit");
   next = checkVictory(next);
   if (next.phase !== "game-over" && getCurrentPlayer(next).id === playerId) {
     next = endTurn({ ...next, phase: "awaiting-end-turn", pendingPropertyId: null, extraRollAvailable: false });

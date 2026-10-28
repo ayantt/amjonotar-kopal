@@ -17,7 +17,11 @@ export interface PropertyState {
   hotel?: boolean;
 }
 export type GamePhase = "role-selection" | "awaiting-roll" | "awaiting-end-turn" | "game-over";
-export interface GameEvent { id: number; message: string; kind: "system" | "movement" | "money" | "ai"; }
+/**
+ * `key` is a stable, machine-readable name for what happened (for example `space:income-tax`, `card:cc-3`, `bankrupt`), used by the
+ * UI to choose event-specific media. It is optional: older saved games and ordinary log lines have none.
+ */
+export interface GameEvent { id: number; message: string; kind: "system" | "movement" | "money" | "ai"; key?: string; }
 export interface GameState {
   schemaVersion: 1; phase: GamePhase; players: Player[]; currentPlayerIndex: number;
   publicFund: number; cooperativeFund: number; properties: Record<string, PropertyState>;
