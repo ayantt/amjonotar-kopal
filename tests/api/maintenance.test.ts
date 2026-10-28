@@ -33,7 +33,7 @@ describe("maintenance endpoint", () => {
   it("prunes when the secret matches", async () => {
     const res = await call("Bearer cron-secret");
     expect(res.statusCode).toBe(200);
-    expect(res.body.pruned).toEqual({ rooms: 1, rateLimits: 1, abandonedGames: 1, oldGames: 1 });
-    expect(queries.length).toBe(4);
+    expect(res.body.pruned).toEqual({ rooms: 1, rateLimits: 1, abandonedGames: 1, oldGames: 1, oldEvents: 1 });
+    expect(queries.length).toBe(5);
   });
 });

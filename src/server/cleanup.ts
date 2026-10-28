@@ -6,6 +6,7 @@ export const RETENTION = {
   rateLimitHours: 2,
   abandonedAnalyticsDays: 30,
   analyticsDays: 365,
+  eventDays: 365,
 } as const;
 
 export interface PruneResult {
@@ -13,6 +14,7 @@ export interface PruneResult {
   rateLimits: number;
   abandonedGames: number;
   oldGames: number;
+  oldEvents: number;
 }
 
 const countOf = (rows: unknown): number => Number((rows as Array<{ n?: number | string }>)[0]?.n ?? 0);
@@ -28,5 +30,6 @@ export async function pruneStaleData(sql: NeonSql): Promise<PruneResult> {
   const rateLimits = await step("rate limits", async () => countOf(await sql`WITH d AS (DELETE FROM rate_limits WHERE window_start < NOW() - INTERVAL '2 hours' RETURNING 1) SELECT count(*)::int AS n FROM d`));
   const abandonedGames = await step("abandoned games", async () => countOf(await sql`WITH d AS (DELETE FROM analytics_games WHERE finished_at IS NULL AND COALESCE(last_seen_at, started_at) < NOW() - INTERVAL '30 days' RETURNING 1) SELECT count(*)::int AS n FROM d`));
   const oldGames = await step("old games", async () => countOf(await sql`WITH d AS (DELETE FROM analytics_games WHERE started_at < NOW() - INTERVAL '365 days' RETURNING 1) SELECT count(*)::int AS n FROM d`));
-  return { rooms, rateLimits, abandonedGames, oldGames };
+  const oldEvents = await step("old events", async () => countOf(await sql`WITH d AS (DELETE FROM analytics_events WHERE day < CURRENT_DATE - 365 RETURNING 1) SELECT count(*)::int AS n FROM d`));
+  return { rooms, rateLimits, abandonedGames, oldGames, oldEvents };
 }

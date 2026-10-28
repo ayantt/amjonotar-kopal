@@ -1,10 +1,12 @@
 import { BOARD } from "./board.js";
-import type { GameSummary, SeatSummary } from "./analytics.js";
-import type { MoneyCategory, PropertyDecision } from "./stats.js";
+import type { EndReason, GameSummary, SeatSummary } from "./analytics.js";
+import type { ForfeitReason, MoneyCategory, PropertyDecision } from "./stats.js";
 import type { PlayerRole } from "./types.js";
 
 const CATEGORIES: readonly MoneyCategory[] = ["go", "rent", "coop-rent", "service-charge", "tax", "card", "maintenance", "plaza", "property", "building", "contribution", "mortgage", "redeem", "sale", "other"];
 const ROLES: readonly PlayerRole[] = ["politician", "citizen"];
+const FORFEIT_REASONS: readonly ForfeitReason[] = ["left", "absent"];
+const END_REASONS: readonly EndReason[] = ["bankruptcy", "left", "absent"];
 const DECISIONS: readonly PropertyDecision[] = ["buy", "lease", "decline"];
 const SPACE_IDS = new Set(BOARD.map((space) => space.id));
 const MAX_AMOUNT = 10_000_000;
@@ -42,11 +44,13 @@ function seat(value: unknown, index: number): SeatSummary | null {
   const finalCash = int(value.finalCash, 0, MAX_AMOUNT), netWorth = int(value.netWorth, 0, MAX_AMOUNT * 10), owned = int(value.propertiesOwned, 0, 40);
   const bankruptRound = value.bankruptRound === null ? null : int(value.bankruptRound, 0, 5000);
   const cause = value.bankruptCause === null ? null : CATEGORIES.find((item) => item === value.bankruptCause) ?? null;
+  const forfeitReason = value.forfeitReason === undefined || value.forfeitReason === null ? null : FORFEIT_REASONS.find((item) => item === value.forfeitReason);
+  if (forfeitReason === undefined) return null;
   if (!seatRole || !flowIn || !flowOut || finalCash === null || netWorth === null || owned === null || typeof value.bankrupt !== "boolean") return null;
   if (value.bankruptRound !== null && bankruptRound === null) return null;
   if (value.controller !== "human" && value.controller !== "ai") return null;
   if (int(value.seat, 0, 5) !== index) return null;
-  return { seat: index, role: seatRole, controller: value.controller, bankrupt: value.bankrupt, bankruptRound, bankruptCause: cause, finalCash, propertiesOwned: owned, netWorth, flowIn, flowOut };
+  return { seat: index, role: seatRole, controller: value.controller, bankrupt: value.bankrupt, bankruptRound, bankruptCause: cause, forfeitReason, finalCash, propertiesOwned: owned, netWorth, flowIn, flowOut };
 }
 
 /**
@@ -105,6 +109,10 @@ export function parseGameSummary(value: unknown): GameSummary | null {
     if (round === null || (entry.politician !== null && politician === null) || (entry.citizen !== null && citizen === null)) return null;
     cashByRound.push({ round, politician, citizen });
   }
+  const endedBy = value.endedBy === undefined || value.endedBy === null ? null : END_REASONS.find((item) => item === value.endedBy);
+  if (endedBy === undefined) return null;
+  const autoPlayedTurns = value.autoPlayedTurns === undefined ? 0 : int(value.autoPlayedTurns, 0, 100_000);
+  if (autoPlayedTurns === null) return null;
   const humanSeat = seats.findIndex((item) => item.controller === "human");
   const single = value.mode === "single";
   return {
@@ -112,6 +120,6 @@ export function parseGameSummary(value: unknown): GameSummary | null {
     winnerRole: winnerSeat === null ? null : seats[winnerSeat].role,
     humanRole: single ? seats[humanSeat].role : null,
     humanWon: single ? winnerSeat === humanSeat : null,
-    players: seats, landings, rentBySpace, cardDraws, decisions, builds, cashByRound,
+    players: seats, landings, rentBySpace, cardDraws, decisions, builds, cashByRound, endedBy, autoPlayedTurns,
   };
 }

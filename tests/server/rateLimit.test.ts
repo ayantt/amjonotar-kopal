@@ -74,7 +74,7 @@ describe("pruneStaleData", () => {
       const q = strings.join(" ");
       return [{ n: q.includes("multiplayer_rooms") ? 3 : q.includes("rate_limits") ? 40 : q.includes("finished_at IS NULL") ? 5 : 7 }];
     }) as unknown as Parameters<typeof pruneStaleData>[0];
-    expect(await pruneStaleData(sql)).toEqual({ rooms: 3, rateLimits: 40, abandonedGames: 5, oldGames: 7 });
+    expect(await pruneStaleData(sql)).toEqual({ rooms: 3, rateLimits: 40, abandonedGames: 5, oldGames: 7, oldEvents: 7 });
   });
 
   it("keeps going when one step fails (for example a table that does not exist yet)", async () => {
@@ -83,7 +83,7 @@ describe("pruneStaleData", () => {
       if (strings.join(" ").includes("rate_limits")) throw new Error('relation "rate_limits" does not exist');
       return [{ n: 2 }];
     }) as unknown as Parameters<typeof pruneStaleData>[0];
-    expect(await pruneStaleData(sql)).toEqual({ rooms: 2, rateLimits: 0, abandonedGames: 2, oldGames: 2 });
+    expect(await pruneStaleData(sql)).toEqual({ rooms: 2, rateLimits: 0, abandonedGames: 2, oldGames: 2, oldEvents: 2 });
   });
 
   it("only deletes data past its retention window", async () => {
@@ -92,6 +92,7 @@ describe("pruneStaleData", () => {
     await pruneStaleData(sql);
     expect(queries.join("\n")).toMatch(/expires_at < NOW\(\) - INTERVAL '1 hour'/);
     expect(queries.join("\n")).toMatch(/finished_at IS NULL AND COALESCE\(last_seen_at, started_at\) < NOW\(\) - INTERVAL '30 days'/);
-    expect(queries.every((q) => /WHERE .* < NOW\(\) - INTERVAL/.test(q))).toBe(true);
+    expect(queries.every((q) => /WHERE .* < (NOW\(\) - INTERVAL|CURRENT_DATE - 365)/.test(q))).toBe(true);
+    expect(queries.join("\n")).toMatch(/DELETE FROM analytics_events WHERE day < CURRENT_DATE - 365/);
   });
 });

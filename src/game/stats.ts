@@ -8,6 +8,8 @@ export type MoneyCategory =
 export interface PayTag { category: MoneyCategory; spaceId?: string }
 export interface PlayerFlow { in: Partial<Record<MoneyCategory, number>>; out: Partial<Record<MoneyCategory, number>> }
 export type PropertyDecision = "buy" | "lease" | "decline";
+/** Why a seat was removed without going bankrupt: the player chose to leave, or was away for too many turns. */
+export type ForfeitReason = "left" | "absent";
 
 /** Structured per-game counters, recorded by the engine as the game is played. Optional so older saved rooms still load. */
 export interface GameStats {
@@ -20,6 +22,10 @@ export interface GameStats {
   bankruptcies: Array<{ playerId: string; round: number; cause: MoneyCategory }>;
   /** Cash of every player at the start of each round, for wealth-over-time curves. */
   cashHistory: Array<{ round: number; cash: Record<string, number> }>;
+  /** Online only. Optional so games and saves from before this was recorded still load. */
+  forfeits?: Array<{ playerId: string; round: number; reason: ForfeitReason }>;
+  /** Online only: how many turns the computer played for an absent human. */
+  autoTurns?: number;
 }
 
 /** Only the first 120 rounds are kept: summaries drop later rounds anyway, and this bounds the size of saved game state. */
@@ -76,4 +82,10 @@ export function recordCashSnapshot(state: GameState): GameState {
     const entry = { round: state.round, cash: Object.fromEntries(state.players.map((player) => [player.id, player.cash])) };
     return { ...stats, cashHistory: [...stats.cashHistory, entry] };
   });
+}
+export function recordForfeit(state: GameState, playerId: string, reason: ForfeitReason): GameState {
+  return update(state, (stats) => ({ ...stats, forfeits: [...(stats.forfeits ?? []), { playerId, round: state.round, reason }] }));
+}
+export function recordAutoTurn(state: GameState): GameState {
+  return update(state, (stats) => ({ ...stats, autoTurns: (stats.autoTurns ?? 0) + 1 }));
 }

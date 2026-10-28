@@ -14,12 +14,13 @@ type FakeRoom = {
   expiresAt: string;
 };
 
-const db = vi.hoisted(() => ({ room: null as FakeRoom | null, limits: new Map<string, number>() }));
+const db = vi.hoisted(() => ({ room: null as FakeRoom | null, limits: new Map<string, number>(), events: [] as string[] }));
 
 vi.mock("@neondatabase/serverless", () => ({
   neon: () => async (strings: TemplateStringsArray, ...values: unknown[]) => {
     const query = strings.join(" ? ").replace(/\s+/g, " ").trim();
     if (query.startsWith("CREATE TABLE") || query.startsWith("ALTER TABLE")) return [];
+    if (query.startsWith("INSERT INTO analytics_events")) { db.events.push(String(values[0])); return []; }
     if (query.startsWith("INSERT INTO rate_limits")) {
       const key = `${values[0]}|${values[1]}`;
       const count = (db.limits.get(key) ?? 0) + 1;
@@ -113,6 +114,7 @@ describe("multiplayer API hardening", () => {
   beforeEach(() => {
     db.room = null;
     db.limits.clear();
+    db.events.length = 0;
     process.env.DATABASE_URL = "postgres://test.invalid/fake";
   });
 
@@ -232,7 +234,7 @@ describe("absent players", () => {
     expect(room.state.phase).toBe("game-over");
     expect(room.state.players.filter((p) => !p.bankrupt)).toHaveLength(1);
     expect(room.state.players.some((p) => p.id === room.state.winner)).toBe(true);
-    expect(room.state.events.some((e) => /left the game and forfeited/.test(e.message))).toBe(true);
+    expect(room.state.events.some((e) => /was away for too many turns and forfeited/.test(e.message))).toBe(true);
   });
 
   it("keeps the seat while the player keeps acting, resetting the missed-turn count", async () => {
@@ -271,6 +273,7 @@ describe("multiplayer rate limiting", () => {
   beforeEach(() => {
     db.room = null;
     db.limits.clear();
+    db.events.length = 0;
     process.env.DATABASE_URL = "postgres://test.invalid/fake";
   });
 
@@ -312,5 +315,11 @@ describe("multiplayer rate limiting", () => {
     const headers = { "x-real-ip": "203.0.113.60" };
     for (let i = 0; i < 120; i++) expect((await call(`rooms/${code}/heartbeat`, "POST", {}, String(created.body.token), headers)).statusCode).toBe(204);
     expect((await call(`rooms/${code}/heartbeat`, "POST", {}, String(created.body.token), headers)).statusCode).toBe(429);
+  });
+
+  it("counts each created room once, without storing anything about it", async () => {
+    await call("rooms", "POST", { name: "Host" });
+    await call("rooms", "POST", { name: "Host" });
+    expect(db.events).toEqual(["room-created", "room-created"]);
   });
 });

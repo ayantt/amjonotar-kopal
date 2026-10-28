@@ -4,12 +4,18 @@ import { summarizeGame } from "../../src/game/analytics";
 import { simulateAiGame } from "../../src/game/simulate";
 
 type Row = { game_id: string; mode: string; player_count: number; human_role: string | null; started_at: string; finished_at: string | null; summary: unknown; last_round?: number | null; last_seen_at?: string | null };
-const db = vi.hoisted(() => ({ rows: new Map<string, Row>(), limits: new Map<string, number>() }));
+const db = vi.hoisted(() => ({ rows: new Map<string, Row>(), limits: new Map<string, number>(), events: new Map<string, number>() }));
 
 vi.mock("@neondatabase/serverless", () => ({
   neon: () => async (strings: TemplateStringsArray, ...values: unknown[]) => {
     const query = strings.join(" ? ").replace(/\s+/g, " ").trim();
     if (query.startsWith("CREATE TABLE") || query.startsWith("ALTER TABLE")) return [];
+    if (query.startsWith("INSERT INTO analytics_events")) {
+      const event = String(values[0]);
+      db.events.set(event, (db.events.get(event) ?? 0) + 1);
+      return [];
+    }
+    if (query.startsWith("SELECT day::text")) return [...db.events.entries()].map(([event, count]) => ({ day: "2026-10-28", event, count }));
     if (query.startsWith("INSERT INTO rate_limits")) {
       const key = `${values[0]}|${values[1]}`;
       db.limits.set(key, (db.limits.get(key) ?? 0) + 1);
@@ -64,6 +70,7 @@ describe("analytics API", () => {
   beforeEach(() => {
     db.rows.clear();
     db.limits.clear();
+    db.events.clear();
     process.env.DATABASE_URL = "postgres://test.invalid/fake";
     process.env.ANALYTICS_ADMIN_TOKEN = "correct-token";
   });
@@ -141,6 +148,7 @@ describe("analytics rate limiting", () => {
   beforeEach(() => {
     db.rows.clear();
     db.limits.clear();
+    db.events.clear();
     process.env.DATABASE_URL = "postgres://test.invalid/fake";
     process.env.ANALYTICS_ADMIN_TOKEN = "correct-token";
   });
@@ -157,5 +165,46 @@ describe("analytics rate limiting", () => {
     expect((await call("summary", "GET", {}, "guess-final", "198.51.100.5")).statusCode).toBe(429);
     expect((await call("summary", "GET", {}, "correct-token", "198.51.100.5")).statusCode).toBe(429);
     expect((await call("summary", "GET", {}, "correct-token", "198.51.100.6")).statusCode).toBe(200);
+  });
+});
+
+describe("analytics events and insights", () => {
+  beforeEach(() => {
+    db.rows.clear(); db.limits.clear(); db.events.clear();
+    process.env.DATABASE_URL = "postgres://test.invalid/fake";
+    process.env.ANALYTICS_ADMIN_TOKEN = "correct-token";
+  });
+
+  it("counts known anonymous events", async () => {
+    expect((await call("events", "POST", { event: "visit" })).statusCode).toBe(204);
+    expect((await call("events", "POST", { event: "visit" })).statusCode).toBe(204);
+    expect((await call("events", "POST", { event: "replay" })).statusCode).toBe(204);
+    expect(db.events.get("visit")).toBe(2);
+    expect(db.events.get("replay")).toBe(1);
+  });
+
+  it("rejects unknown events, server-only events and wrong methods", async () => {
+    expect((await call("events", "POST", { event: "anything" })).statusCode).toBe(400);
+    expect((await call("events", "POST", { event: "room-created" })).statusCode).toBe(400);
+    expect((await call("events", "POST", {})).statusCode).toBe(400);
+    const get = await call("events", "GET");
+    expect(get.statusCode).toBe(405);
+    expect(db.events.size).toBe(0);
+  });
+
+  it("rate limits event floods like other writes", async () => {
+    for (let i = 0; i < 120; i++) expect((await call("events", "POST", { event: "visit" }, undefined, "203.0.113.90")).statusCode).toBe(204);
+    expect((await call("events", "POST", { event: "visit" }, undefined, "203.0.113.90")).statusCode).toBe(429);
+  });
+
+  it("returns the journey and online health to the admin", async () => {
+    await call("events", "POST", { event: "visit" });
+    await call("games/start", "POST", { gameId: GAME_ID, mode: "single", humanRole: "citizen" });
+    const result = await call("summary", "GET", {}, "correct-token");
+    expect(result.statusCode).toBe(200);
+    const journey = result.body.journey as { steps: Array<{ key: string; count: number }> };
+    expect(journey.steps.find((s) => s.key === "visits")?.count).toBe(1);
+    expect(journey.steps.find((s) => s.key === "started")?.count).toBe(1);
+    expect(result.body.onlineHealth).toMatchObject({ roomsCreated: 0, started: 0 });
   });
 });

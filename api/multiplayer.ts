@@ -4,7 +4,7 @@ import { applyMultiplayerAction, createMultiplayerGame, forfeitPlayer, type Mult
 import { summarizeGame } from "../src/game/analytics.js";
 import type { GameState } from "../src/game/types.js";
 import { advanceAbsentPlayer } from "../src/server/roomTick.js";
-import { ensureAnalyticsTable, recordGameFinish, recordGameStart, type NeonSql as AnalyticsSql } from "../src/server/analyticsStore.js";
+import { ensureAnalyticsTable, recordEvent, recordGameFinish, recordGameStart, type NeonSql as AnalyticsSql } from "../src/server/analyticsStore.js";
 import { clientIp, checkRateLimits, RATE_RULES, type RateRule } from "../src/server/rateLimit.js";
 import { pruneStaleData } from "../src/server/cleanup.js";
 
@@ -171,6 +171,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const code = newCode();
         try {
           const rows = await sql`INSERT INTO multiplayer_rooms (code, status, host_player_id, seats, version, expires_at) VALUES (${code}, 'waiting', ${playerId}, ${JSON.stringify([seat])}::jsonb, 1, NOW() + INTERVAL '12 hours') RETURNING code, status, host_player_id AS "hostPlayerId", seats, state, version, created_at AS "createdAt", expires_at AS "expiresAt"`;
+          await recordOnlineAnalytics(sql, async (analyticsSql) => recordEvent(analyticsSql, "room-created"));
           return send(res, 201, { room: publicRoom(rows[0] as unknown as RoomRow), playerId, token });
         } catch (error) {
           if (attempt === 3) throw error;

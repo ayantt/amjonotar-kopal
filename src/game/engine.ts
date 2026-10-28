@@ -2,7 +2,7 @@ import { BOARD, BOARD_SPACE_COUNT } from "./board.js";
 import { GAME_RULES } from "./rules.js";
 import { drawCard, type CardEffect } from "./cards.js";
 import { countRailroads, createPropertyLedger, getBaseRent, getLegalPropertyActions, isPurchasable, type PropertyAction } from "./properties.js";
-import { recordBankruptcy, recordBuild, recordCard, recordCashSnapshot, recordDecision, recordFlow, recordLanding, recordRent, type PayTag } from "./stats.js";
+import { recordBankruptcy, recordBuild, recordCard, recordCashSnapshot, recordDecision, recordFlow, recordForfeit, recordLanding, recordRent, type ForfeitReason, type PayTag } from "./stats.js";
 import type { Controller, GameEvent, GameState, NewGameOptions, Player, PlayerRole } from "./types.js";
 
 const defaultRandom = () => Math.random();
@@ -592,7 +592,7 @@ export function announce(state: GameState, message: string, kind: GameEvent["kin
  * unowned market without buildings, and they are out. The last player standing still wins (RD-125). If it was their turn,
  * play passes on. Already-bankrupt players and finished games are left untouched.
  */
-export function forfeitPlayer(state: GameState, playerId: string): GameState {
+export function forfeitPlayer(state: GameState, playerId: string, reason: ForfeitReason = "left"): GameState {
   const player = state.players.find((p) => p.id === playerId);
   if (!player || player.bankrupt || state.phase === "game-over") return state;
   let next: GameState = {
@@ -604,7 +604,10 @@ export function forfeitPlayer(state: GameState, playerId: string): GameState {
       : property.leaseholderId === playerId ? [id, { ...property, leaseholderId: null, leaseExpiresAtGoPass: null }] : [id, property])),
   };
   next = recordBankruptcy(next, playerId, "other");
-  next = addEvent(next, `${player.name} left the game and forfeited. Their cash went to the public treasury and their property returned to the market.`);
+  next = recordForfeit(next, playerId, reason);
+  next = addEvent(next, reason === "absent"
+    ? `${player.name} was away for too many turns and forfeited. Their cash went to the public treasury and their property returned to the market.`
+    : `${player.name} left the game and forfeited. Their cash went to the public treasury and their property returned to the market.`);
   next = checkVictory(next);
   if (next.phase !== "game-over" && getCurrentPlayer(next).id === playerId) {
     next = endTurn({ ...next, phase: "awaiting-end-turn", pendingPropertyId: null, extraRollAvailable: false });
