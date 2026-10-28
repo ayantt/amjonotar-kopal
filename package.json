@@ -13,18 +13,19 @@
     "analytics:report": "vitest run --config vitest.report.config.ts"
   },
   "dependencies": {
-    "@vitejs/plugin-react": "latest",
+    "@neondatabase/serverless": "latest",
     "@vercel/analytics": "^2.0.1",
+    "@vercel/speed-insights": "^2.0.0",
+    "@vitejs/plugin-react": "latest",
     "react": "latest",
     "react-dom": "latest",
-    "vite": "latest",
-    "@neondatabase/serverless": "latest"
+    "vite": "latest"
   },
   "devDependencies": {
     "@types/react": "latest",
     "@types/react-dom": "latest",
+    "@vercel/node": "latest",
     "typescript": "latest",
-    "vitest": "latest",
-    "@vercel/node": "latest"
+    "vitest": "latest"
   }
 }
