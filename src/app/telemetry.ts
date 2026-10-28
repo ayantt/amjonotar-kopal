@@ -33,3 +33,30 @@ export function trackGameFinish(gameId: string, state: GameState) {
 export function trackGameProgress(gameId: string, round: number) {
   post("/api/analytics/games/progress", { gameId, round });
 }
+
+/* Anonymous daily counters. Nothing identifying is sent: just the name of the event. */
+const SESSION_FLAG = "amjonotar-kopal-session";
+function flag(key: string): boolean {
+  try { return sessionStorage.getItem(`${SESSION_FLAG}-${key}`) === "1"; } catch { return false; }
+}
+function setFlag(key: string, on: boolean) {
+  try { if (on) sessionStorage.setItem(`${SESSION_FLAG}-${key}`, "1"); else sessionStorage.removeItem(`${SESSION_FLAG}-${key}`); } catch { /* Counting is best effort. */ }
+}
+/** Counts one visit per browser tab session. */
+export function trackVisit() {
+  if (flag("visited")) return;
+  setFlag("visited", true);
+  post("/api/analytics/events", { event: "visit" });
+}
+export function trackLobbyOpen() {
+  post("/api/analytics/events", { event: "lobby-open" });
+}
+/** Counts a new game started after finishing one in the same tab session. */
+export function trackReplayIfAny() {
+  if (!flag("finished-a-game")) return;
+  setFlag("finished-a-game", false);
+  post("/api/analytics/events", { event: "replay" });
+}
+export function markGameFinished() {
+  setFlag("finished-a-game", true);
+}

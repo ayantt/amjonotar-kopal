@@ -8,7 +8,7 @@ import { GameScreen, type GameActions } from "./GameScreen";
 import { MultiplayerLobby } from "./MultiplayerLobby";
 import { clearSavedGame, loadSavedGame, writeSavedGame } from "./saveStorage";
 import { playSound } from "./sound";
-import { newGameId, trackGameFinish, trackGameProgress, trackGameStart } from "./telemetry";
+import { markGameFinished, newGameId, trackGameFinish, trackGameProgress, trackGameStart, trackLobbyOpen, trackReplayIfAny, trackVisit } from "./telemetry";
 import { useEventFeed } from "./useEventFeed";
 
 const roleName = (role: PlayerRole) => role === "politician" ? "Politician" : "Citizen";
@@ -21,6 +21,8 @@ export function App() {
   const [saved, setSaved] = useState(loadSavedGame);
   const gameRef = useRef<GameState | null>(null);
   gameRef.current = game;
+  // One anonymous count per tab session, never for the admin dashboard.
+  useEffect(() => { if (window.location.hash !== "#/analytics") trackVisit(); }, []);
   useEffect(() => {
     const syncRoute = () => setShowAnalytics(window.location.hash === "#/analytics");
     window.addEventListener("hashchange", syncRoute);
@@ -80,6 +82,7 @@ export function App() {
   useEffect(() => {
     if (victory && game && gameId.current) {
       trackGameFinish(gameId.current, game);
+      markGameFinished();
       gameId.current = null;
     }
     if (victory) playSound("victory", soundEnabled);
@@ -95,6 +98,7 @@ export function App() {
     setSaved(null);
     gameId.current = newGameId();
     lastProgressRound.current = 0;
+    trackReplayIfAny();
     trackGameStart(gameId.current, role);
     playSound("start", soundEnabled);
     setBusy(false);
@@ -197,7 +201,7 @@ export function App() {
         <button className="role-card politician-card" onClick={() => startGame("politician")}><span className="role-number">01 / POWER</span><strong>Play as Politician</strong><span>Two dice. Special privileges. Keep the system on your side.</span><span className="button-copy">TAKE THE CHAIR ↗</span></button>
         <button className="role-card citizen-card" onClick={() => startGame("citizen")}><span className="role-number">02 / PEOPLE</span><strong>Play as Citizen</strong><span>One die. Three citizens. Your best chance is to work together.</span><span className="button-copy">JOIN THE PUBLIC ↗</span></button>
       </div>
-      <button className="multiplayer-entry" onClick={() => setShowMultiplayer(true)}><span><strong>PLAY WITH FRIENDS</strong><small>Online multiplayer · room code · four human players</small></span><b>CREATE / JOIN ROOM ↗</b></button>
+      <button className="multiplayer-entry" onClick={() => { trackLobbyOpen(); setShowMultiplayer(true); }}><span><strong>PLAY WITH FRIENDS</strong><small>Online multiplayer · room code · four human players</small></span><b>CREATE / JOIN ROOM ↗</b></button>
     </section>
     <footer className="site-footer"><span>FICTIONAL POLITICAL SATIRE</span><span>4 SEATS · SINGLE-PLAYER OR ONLINE</span><span className="privacy-note">ANONYMOUS GAME STATS ONLY · NO NAMES, NO TRACKING IDS · DO NOT TRACK HONOURED</span></footer>
   </main>;

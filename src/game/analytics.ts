@@ -1,5 +1,5 @@
 import { BOARD } from "./board.js";
-import type { MoneyCategory, PropertyDecision } from "./stats.js";
+import type { ForfeitReason, MoneyCategory, PropertyDecision } from "./stats.js";
 import { emptyStats } from "./stats.js";
 import type { GameState, PlayerRole } from "./types.js";
 
@@ -7,6 +7,8 @@ import type { GameState, PlayerRole } from "./types.js";
  * Anonymous, finished-game summary. It deliberately contains no player names, ids, IPs or room codes:
  * players are identified only by seat number and role.
  */
+/** How a finished game ended: the last opponent went bankrupt, chose to leave, or was away too long. */
+export type EndReason = "bankruptcy" | ForfeitReason;
 export interface GameSummary {
   schemaVersion: 1;
   mode: "single" | "online";
@@ -25,6 +27,10 @@ export interface GameSummary {
   builds: Record<PlayerRole, number>;
   /** Mean cash of each role at the start of each round (rounds beyond 120 are dropped to keep summaries small). */
   cashByRound: Array<{ round: number; politician: number | null; citizen: number | null }>;
+  /** What removed the last defeated player. Absent in summaries recorded before this existed. */
+  endedBy?: EndReason | null;
+  /** Online only: turns the computer played for absent players. Absent in older summaries. */
+  autoPlayedTurns?: number;
 }
 export interface SeatSummary {
   seat: number;
@@ -33,6 +39,8 @@ export interface SeatSummary {
   bankrupt: boolean;
   bankruptRound: number | null;
   bankruptCause: MoneyCategory | null;
+  /** Set when this seat forfeited instead of going bankrupt. Absent in older summaries. */
+  forfeitReason?: ForfeitReason | null;
   finalCash: number;
   propertiesOwned: number;
   /** Cash plus listed price of owned properties (mortgaged ones included). */
@@ -50,9 +58,10 @@ export function summarizeGame(state: GameState, mode: GameSummary["mode"]): Game
     const owned = Object.values(state.properties).filter((property) => property.ownerId === player.id);
     const ownedValue = owned.reduce((sum, property) => sum + (BOARD.find((space) => space.id === property.spaceId)?.price ?? 0), 0);
     const bankruptcy = stats.bankruptcies.find((entry) => entry.playerId === player.id);
+    const forfeit = (stats.forfeits ?? []).find((entry) => entry.playerId === player.id);
     return {
       seat, role: player.role, controller: player.controller, bankrupt: player.bankrupt,
-      bankruptRound: bankruptcy?.round ?? null, bankruptCause: bankruptcy?.cause ?? null,
+      bankruptRound: bankruptcy?.round ?? null, bankruptCause: bankruptcy?.cause ?? null, forfeitReason: forfeit?.reason ?? null,
       finalCash: player.cash, propertiesOwned: owned.length, netWorth: player.cash + ownedValue,
       flowIn: { ...(stats.flow[player.id]?.in ?? {}) }, flowOut: { ...(stats.flow[player.id]?.out ?? {}) },
     };
@@ -65,6 +74,9 @@ export function summarizeGame(state: GameState, mode: GameSummary["mode"]): Game
     };
     return { round: entry.round, politician: mean("politician"), citizen: mean("citizen") };
   });
+  const lastOut = stats.bankruptcies[stats.bankruptcies.length - 1];
+  const lastForfeit = lastOut ? (stats.forfeits ?? []).find((entry) => entry.playerId === lastOut.playerId) : undefined;
+  const endedBy: EndReason | null = state.phase !== "game-over" || !lastOut ? null : lastForfeit?.reason ?? "bankruptcy";
   const human = state.players.findIndex((player) => player.controller === "human");
   const singleHuman = mode === "single" && human >= 0;
   return {
@@ -74,6 +86,7 @@ export function summarizeGame(state: GameState, mode: GameSummary["mode"]): Game
     humanWon: singleHuman ? winnerIndex === human : null,
     players, landings: stats.landings, rentBySpace: stats.rentBySpace, cardDraws: stats.cardDraws,
     decisions: stats.decisions, builds: stats.builds, cashByRound,
+    endedBy, autoPlayedTurns: stats.autoTurns ?? 0,
   };
 }
 
@@ -99,6 +112,12 @@ export interface AnalyticsReport {
   buildsPerGame: Record<PlayerRole, number>;
   meanNetWorth: Record<PlayerRole, number | null>;
   wealthCurve: Array<{ round: number; politician: number | null; citizen: number | null; games: number }>;
+  /** How finished games ended. `unknown` covers summaries recorded before end reasons were tracked. */
+  endReasons: Record<EndReason | "unknown", number>;
+  /** Share of seats that forfeited, and what the forfeits were. */
+  forfeits: { seats: number; left: number; absent: number; rate: number | null };
+  /** Online only: turns the computer played for absent players, per finished game. */
+  autoPlayedTurnsPerGame: number | null;
 }
 
 /** 95% Wilson score interval for a win rate; behaves sensibly for small samples and rates near 0 or 1. */
@@ -133,9 +152,16 @@ export function aggregateSummaries(summaries: GameSummary[]): AnalyticsReport {
   const builds = { politician: 0, citizen: 0 };
   const curve = new Map<number, { politician: number[]; citizen: number[] }>();
   const humanWins: Record<PlayerRole, [number, number]> = { politician: [0, 0], citizen: [0, 0] };
+  const endReasons: Record<EndReason | "unknown", number> = { bankruptcy: 0, left: 0, absent: 0, unknown: 0 };
+  const forfeits = { left: 0, absent: 0 };
+  let seatCount = 0, autoTurns = 0, autoGames = 0;
 
   for (const summary of summaries) {
+    endReasons[summary.endedBy ?? "unknown"] += 1;
+    if (summary.mode === "online") { autoGames += 1; autoTurns += summary.autoPlayedTurns ?? 0; }
     for (const seat of summary.players) {
+      seatCount += 1;
+      if (seat.forfeitReason) forfeits[seat.forfeitReason] += 1;
       const total = flowTotals[seat.role];
       total.seats += 1; seats[seat.role] += 1; worth[seat.role].push(seat.netWorth);
       for (const [category, amount] of Object.entries(seat.flowIn)) total.in[category as MoneyCategory] = (total.in[category as MoneyCategory] ?? 0) + (amount ?? 0);
@@ -186,5 +212,8 @@ export function aggregateSummaries(summaries: GameSummary[]): AnalyticsReport {
     meanNetWorth: { politician: mean(worth.politician), citizen: mean(worth.citizen) },
     wealthCurve: [...curve.entries()].sort((a, b) => a[0] - b[0]).map(([round, bucket]) => ({
       round, politician: mean(bucket.politician), citizen: mean(bucket.citizen), games: Math.max(bucket.politician.length, bucket.citizen.length) })),
+    endReasons,
+    forfeits: { seats: forfeits.left + forfeits.absent, ...forfeits, rate: share(forfeits.left + forfeits.absent, seatCount) },
+    autoPlayedTurnsPerGame: autoGames > 0 ? Math.round((autoTurns / autoGames) * 100) / 100 : null,
   };
 }

@@ -12,11 +12,41 @@ export interface AnalyticsOverview {
   /** Player behaviour per scope: who plays, how long, and where they stop. */
   activity: Record<"all" | GameMode, PlayerActivity>;
   reports: { all: AnalyticsReport; single: AnalyticsReport; online: AnalyticsReport };
+  /** From first visit to replay: where single-player visitors drop out. */
+  journey: Journey;
+  /** Whether online rooms get created, started and finished. */
+  onlineHealth: OnlineHealth;
+}
+
+/** Anonymous daily counters. No ids, no cookies: each event is just "this happened once today". */
+export const CLIENT_EVENTS = ["visit", "replay", "lobby-open"] as const;
+export const SERVER_EVENTS = ["room-created"] as const;
+export type AnalyticsEvent = typeof CLIENT_EVENTS[number] | typeof SERVER_EVENTS[number];
+export const isClientEvent = (value: unknown): value is typeof CLIENT_EVENTS[number] => CLIENT_EVENTS.some((event) => event === value);
+export interface EventTotals { counts: Partial<Record<AnalyticsEvent, number>>; since: string | null }
+
+export interface JourneyStep { key: "visits" | "started" | "reached-5" | "finished" | "replayed"; label: string; count: number; /** Share of the previous step, null when there is nothing to compare with. */ rateOfPrevious: number | null }
+export interface Journey { steps: JourneyStep[]; since: string | null }
+export interface OnlineHealth {
+  lobbyOpens: number;
+  roomsCreated: number;
+  started: number;
+  finished: number;
+  abandoned: number;
+  inProgress: number;
+  /** Rooms that reached a started game, as a share of rooms created (counted since tracking began). */
+  startRate: number | null;
+  finishRate: number | null;
+  medianMinutes: number | null;
+  since: string | null;
 }
 
 const MAX_ROWS = 5000;
 
+let tablesReady = false;
+export function resetAnalyticsTableCache(): void { tablesReady = false; }
 export async function ensureAnalyticsTable(sql: NeonSql): Promise<void> {
+  if (tablesReady) return;
   await sql`CREATE TABLE IF NOT EXISTS analytics_games (
     game_id text PRIMARY KEY,
     mode text NOT NULL CHECK (mode IN ('single', 'online')),
@@ -29,6 +59,26 @@ export async function ensureAnalyticsTable(sql: NeonSql): Promise<void> {
   // Drop-off tracking: the highest round a single-player game reached and when it last reported.
   await sql`ALTER TABLE analytics_games ADD COLUMN IF NOT EXISTS last_round integer`;
   await sql`ALTER TABLE analytics_games ADD COLUMN IF NOT EXISTS last_seen_at timestamptz`;
+  await sql`CREATE TABLE IF NOT EXISTS analytics_events (
+    day date NOT NULL,
+    event text NOT NULL,
+    count integer NOT NULL DEFAULT 0,
+    PRIMARY KEY (day, event)
+  )`;
+  tablesReady = true;
+}
+
+export async function recordEvent(sql: NeonSql, event: AnalyticsEvent): Promise<void> {
+  await sql`INSERT INTO analytics_events (day, event, count) VALUES (CURRENT_DATE, ${event}, 1) ON CONFLICT (day, event) DO UPDATE SET count = analytics_events.count + 1`;
+}
+export async function readEventTotals(sql: NeonSql): Promise<EventTotals> {
+  const rows = await sql`SELECT day::text AS day, event, count FROM analytics_events ORDER BY day` as unknown as Array<{ day: string; event: string; count: number | string }>;
+  const counts: Partial<Record<AnalyticsEvent, number>> = {};
+  for (const row of rows) {
+    const known = [...CLIENT_EVENTS, ...SERVER_EVENTS].find((event) => event === row.event);
+    if (known) counts[known] = (counts[known] ?? 0) + Number(row.count);
+  }
+  return { counts, since: rows[0]?.day ?? null };
 }
 
 /** Game ids are random client/server tokens, never room codes or player data. */
@@ -122,6 +172,31 @@ export function summarizeActivity(rows: StoredRow[], now: number): PlayerActivit
   };
 }
 
+const step = (previous: number | null, count: number) => previous && previous > 0 ? Math.min(1, Math.round((count / previous) * 1000) / 1000) : null;
+const REACHED_ROUND = 5;
+
+/** Pure: where single-player visitors drop out between opening the site and playing again. */
+export function buildJourney(rows: StoredRow[], events: EventTotals): Journey {
+  const single = rows.filter((row) => row.mode === "single");
+  const reached = single.filter((row) => row.finishedAt || (row.lastRound ?? 0) >= REACHED_ROUND).length;
+  const finished = single.filter((row) => row.finishedAt).length;
+  const counts = [events.counts.visit ?? 0, single.length, reached, finished, events.counts.replay ?? 0];
+  const labels: Array<[JourneyStep["key"], string]> = [["visits", "Opened the game"], ["started", "Started a game"], ["reached-5", `Reached round ${REACHED_ROUND}`], ["finished", "Finished a game"], ["replayed", "Played again"]];
+  return { since: events.since, steps: labels.map(([key, label], index) => ({ key, label, count: counts[index], rateOfPrevious: index === 0 ? null : step(counts[index - 1], counts[index]) })) };
+}
+
+/** Pure: how healthy online rooms are, from the rows plus the room-created counter. */
+export function buildOnlineHealth(rows: StoredRow[], events: EventTotals, now: number): OnlineHealth {
+  const activity = summarizeActivity(rows.filter((row) => row.mode === "online"), now);
+  const created = events.counts["room-created"] ?? 0;
+  return {
+    lobbyOpens: events.counts["lobby-open"] ?? 0, roomsCreated: created, started: activity.started, finished: activity.finished,
+    abandoned: activity.abandoned, inProgress: activity.inProgress,
+    startRate: created > 0 ? Math.min(1, Math.round((activity.started / created) * 1000) / 1000) : null,
+    finishRate: activity.completionRate, medianMinutes: activity.durationMinutes?.median ?? null, since: events.since,
+  };
+}
+
 export async function readAnalytics(sql: NeonSql): Promise<AnalyticsOverview> {
   const rows = await sql`SELECT mode, started_at AS "startedAt", finished_at AS "finishedAt", last_round AS "lastRound", last_seen_at AS "lastSeenAt", human_role AS "humanRole", player_count AS "playerCount", summary FROM analytics_games ORDER BY started_at DESC LIMIT ${MAX_ROWS}` as unknown as Array<StoredRow>;
   const funnel = { single: { started: 0, finished: 0, completionRate: null as number | null }, online: { started: 0, finished: 0, completionRate: null as number | null } };
@@ -145,8 +220,11 @@ export async function readAnalytics(sql: NeonSql): Promise<AnalyticsOverview> {
     const { started, finished } = funnel[mode];
     funnel[mode].completionRate = started > 0 ? Math.round((finished / started) * 1000) / 1000 : null;
   }
+  const events = await readEventTotals(sql).catch(() => ({ counts: {}, since: null } as EventTotals));
+  const now = Date.now();
   return {
     generatedAt: new Date().toISOString(),
+    journey: buildJourney(rows, events), onlineHealth: buildOnlineHealth(rows, events, now),
     funnel,
     daily: [...days.entries()].sort((a, b) => a[0].localeCompare(b[0])).slice(-30).map(([day, value]) => ({ day, ...value })),
     activity: {

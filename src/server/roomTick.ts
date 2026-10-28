@@ -1,5 +1,6 @@
 import { ABSENCE, isTurnOverdue, type PresenceInfo } from "../game/absence.js";
 import { forfeitPlayer, getCurrentPlayer } from "../game/engine.js";
+import { recordAutoTurn } from "../game/stats.js";
 import { playOnBehalf, type RandomSource } from "../game/turns.js";
 import type { GameState } from "../game/types.js";
 
@@ -23,6 +24,6 @@ export function advanceAbsentPlayer<S extends TickSeat>(
   if (!seat || current.bankrupt || !isTurnOverdue(seat, turnStartedAt, now)) return unchanged;
   const missed = (seat.missedTurns ?? 0) + 1;
   const nextSeats = seats.map((candidate) => candidate.playerId === seat.playerId ? { ...candidate, missedTurns: missed } : candidate);
-  if (missed >= ABSENCE.forfeitAfterMisses) return { state: forfeitPlayer(state, seat.playerId), seats: nextSeats, outcome: "forfeited" };
-  return { state: playOnBehalf(state, random), seats: nextSeats, outcome: "played" };
+  if (missed >= ABSENCE.forfeitAfterMisses) return { state: forfeitPlayer(state, seat.playerId, "absent"), seats: nextSeats, outcome: "forfeited" };
+  return { state: recordAutoTurn(playOnBehalf(state, random)), seats: nextSeats, outcome: "played" };
 }

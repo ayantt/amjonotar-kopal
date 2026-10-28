@@ -42,6 +42,8 @@ export function AnalyticsDashboard({ onBack }: { onBack: () => void }) {
   useEffect(() => { const saved = readToken(); if (saved) void load(saved); }, [load]);
 
   const report = data?.reports[scope];
+  const endings = report ? ([["Last opponent went bankrupt", report.endReasons.bankruptcy], ["Last opponent left the game", report.endReasons.left], ["Last opponent timed out (away)", report.endReasons.absent], ["Unknown (older games)", report.endReasons.unknown]] as Array<[string, number]>)
+    .map(([label, value]) => ({ label, value })).filter((row) => row.value > 0) : [];
   const activity = data?.activity[scope];
   // Hours are stored in UTC; show them in the viewer's own time zone.
   const hourOffset = useMemo(() => -new Date().getTimezoneOffset() / 60, []);
@@ -62,6 +64,26 @@ export function AnalyticsDashboard({ onBack }: { onBack: () => void }) {
       {error && <p className="multiplayer-error" role="alert">{error}</p>}
       {data && report && activity && <>
         <div className="analytics-tabs" role="tablist" aria-label="Game mode">{(["all", "single", "online"] as const).map((item) => <button key={item} role="tab" aria-selected={scope === item} className={scope === item ? "is-on" : ""} onClick={() => setScope(item)}>{item === "all" ? "ALL GAMES" : item === "single" ? "SINGLE-PLAYER" : "ONLINE"}</button>)}</div>
+
+        {scope !== "online" && <>
+          <h2>Player journey</h2>
+          <div className="viz-grid">
+            <ChartCard wide title="From opening the game to playing again" note={`Single-player only. Each step is a count of games or tab sessions, not people${data.journey.since ? `; visits and replays are counted since ${data.journey.since}` : ""}. The percentage is the share of the step above.`}
+              table={{ head: ["Step", "Count", "Of previous step"], rows: data.journey.steps.map((step) => [step.label, step.count, pct(step.rateOfPrevious)]) }}>
+              <BarList color={NEUTRAL.strong} empty="No visits yet." rows={data.journey.steps.map((step) => ({ label: step.label, value: step.count, detail: step.rateOfPrevious === null ? undefined : pct(step.rateOfPrevious) }))} />
+            </ChartCard>
+          </div>
+        </>}
+        {scope !== "single" && <>
+          <h2>Online rooms</h2>
+          <div className="viz-kpis">
+            <Kpi label="Lobby opened" value={String(data.onlineHealth.lobbyOpens)} hint="times the room screen was opened" />
+            <Kpi label="Rooms created" value={String(data.onlineHealth.roomsCreated)} hint={data.onlineHealth.since ? `since ${data.onlineHealth.since}` : "none counted yet"} />
+            <Kpi label="Rooms that started" value={String(data.onlineHealth.started)} hint={`start rate ${pct(data.onlineHealth.startRate)} of rooms created`} />
+            <Kpi label="Finished" value={String(data.onlineHealth.finished)} hint={`${data.onlineHealth.inProgress} in progress · ${data.onlineHealth.abandoned} abandoned`} />
+            <Kpi label="Completion" value={pct(data.onlineHealth.finishRate)} hint={data.onlineHealth.medianMinutes === null ? "no finished rooms" : `median ${data.onlineHealth.medianMinutes} min`} />
+          </div>
+        </>}
 
         <h2>Players</h2>
         <div className="viz-kpis">
@@ -109,6 +131,10 @@ export function AnalyticsDashboard({ onBack }: { onBack: () => void }) {
               <h4>Income</h4><BarList color={ROLE_COLOR[role]} format={money} rows={sorted(report.moneyFlow[role].in).slice(0, 6).map(([k, v]) => ({ label: titleCase(k), value: v }))} />
               <h4>Spending</h4><BarList color={ROLE_COLOR[role]} format={money} rows={sorted(report.moneyFlow[role].out).slice(0, 6).map(([k, v]) => ({ label: titleCase(k), value: v }))} />
             </ChartCard>)}
+            <ChartCard title="How games end" note="What removed the last defeated player. Older games recorded before this was tracked show as unknown." table={{ head: ["Ending", "Games"], rows: endings.map((e) => [e.label, e.value]) }}>
+              <BarList color={NEUTRAL.strong} empty="No finished games." rows={endings} />
+              {scope !== "single" && <p className="viz-note">{report.forfeits.seats} forfeited seats ({pct(report.forfeits.rate)} of seats): {report.forfeits.left} left, {report.forfeits.absent} timed out. The computer played {report.autoPlayedTurnsPerGame ?? "—"} turns per online game for absent players.</p>}
+            </ChartCard>
             <ChartCard title="Why players go bankrupt" note="Cause of bankruptcy, as a count of players." table={{ head: ["Role", "Cause", "Players"], rows: ROLES.flatMap((r) => sorted(report.bankruptcyCauses[r]).map(([k, v]) => [roleLabel(r), titleCase(k), v])) }}>
               {ROLES.map((role) => <div key={role} className="viz-role-row"><span className="viz-role-name"><i style={{ background: ROLE_COLOR[role] }} />{roleLabel(role)}</span>
                 <BarList color={ROLE_COLOR[role]} empty="No bankruptcies." rows={sorted(report.bankruptcyCauses[role]).slice(0, 5).map(([k, v]) => ({ label: titleCase(k), value: v }))} /></div>)}

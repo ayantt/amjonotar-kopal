@@ -2,7 +2,7 @@ import { createHash, timingSafeEqual } from "node:crypto";
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 import { parseGameSummary } from "../src/game/analyticsValidation.js";
 import { checkRateLimits, clientIp, RATE_RULES } from "../src/server/rateLimit.js";
-import { ensureAnalyticsTable, isValidGameId, readAnalytics, recordGameFinish, recordGameProgress, recordGameStart, type NeonSql } from "../src/server/analyticsStore.js";
+import { ensureAnalyticsTable, isClientEvent, isValidGameId, readAnalytics, recordEvent, recordGameFinish, recordGameProgress, recordGameStart, type AnalyticsEvent, type NeonSql } from "../src/server/analyticsStore.js";
 
 let neonModulePromise: Promise<typeof import("@neondatabase/serverless")> | undefined;
 const MAX_BODY_CHARS = 20_000;
@@ -37,11 +37,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const isStart = route === "games/start" && method === "POST";
   const isFinish = route === "games/finish" && method === "POST";
   const isProgress = route === "games/progress" && method === "POST";
+  const isEvent = route === "events" && method === "POST";
   const isSummary = route === "summary" && method === "GET";
-  if (!isStart && !isFinish && !isProgress && !isSummary) {
-    if (["games/start", "games/finish", "games/progress"].includes(route)) res.setHeader("Allow", "POST");
+  if (!isStart && !isFinish && !isProgress && !isEvent && !isSummary) {
+    if (["games/start", "games/finish", "games/progress", "events"].includes(route)) res.setHeader("Allow", "POST");
     if (route === "summary") res.setHeader("Allow", "GET");
-    return send(res, ["games/start", "games/finish", "games/progress", "summary"].includes(route) ? 405 : 404, { error: "Unknown analytics endpoint." });
+    return send(res, ["games/start", "games/finish", "games/progress", "events", "summary"].includes(route) ? 405 : 404, { error: "Unknown analytics endpoint." });
   }
 
   if (isSummary) {
@@ -56,6 +57,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (JSON.stringify(body).length > MAX_BODY_CHARS) return send(res, 413, { error: "Payload too large." });
     if (!isValidGameId(body.gameId)) return send(res, 400, { error: "A valid gameId is required." });
   }
+  if (isEvent && !isClientEvent(body.event)) return send(res, 400, { error: "Unknown event." });
   const round = isProgress ? body.round : null;
   if (isProgress && (typeof round !== "number" || !Number.isInteger(round) || round < 0 || round > 5000)) return send(res, 400, { error: "A valid round is required." });
   if (isStart && (body.mode !== "single" || (body.humanRole !== "politician" && body.humanRole !== "citizen"))) {
@@ -74,6 +76,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
     if (isSummary && !isAdmin(req, process.env.ANALYTICS_ADMIN_TOKEN ?? "")) return send(res, 401, { error: "A valid admin token is required." });
     await ensureAnalyticsTable(sql);
+    if (isEvent) {
+      await recordEvent(sql, body.event as AnalyticsEvent);
+      return send(res, 204, {});
+    }
     if (isProgress) {
       await recordGameProgress(sql, body.gameId as string, round as number);
       return send(res, 204, {});
