@@ -23,6 +23,13 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   if (!response.ok) throw new MultiplayerRequestError(typeof data.error === "string" ? data.error : "Multiplayer request failed.", response.status, data);
   return data as T;
 }
+/** Time between room polls: fast while the tab is visible, slow while hidden. */
+export const pollDelayMs = (hidden: boolean): number => (hidden ? 5000 : 1600);
+/** How long to pause after a 429, bounded so a bad value can never stall a game for long. */
+export const retryDelayMs = (retryAfterSeconds: unknown): number => {
+  const seconds = Number(retryAfterSeconds);
+  return Number.isFinite(seconds) && seconds > 0 ? Math.min(Math.ceil(seconds), 60) * 1000 : 5000;
+};
 export function MultiplayerLobby({ onBack }: { onBack: () => void }) {
   const [name, setName] = useState(loadPlayerName);
   const [joinCode, setJoinCode] = useState("");
@@ -33,6 +40,7 @@ export function MultiplayerLobby({ onBack }: { onBack: () => void }) {
   const [error, setError] = useState("");
   const [working, setWorking] = useState(false);
   const workingRef = useRef(false);
+  const pauseUntilRef = useRef(0);
   const [isOnline, setIsOnline] = useState(typeof navigator === "undefined" ? true : navigator.onLine);
   const [notice, setNotice] = useState("Create a room or join friends with a room code.");
   const [soundEnabled, setSoundEnabled] = useState(true);
@@ -59,7 +67,10 @@ export function MultiplayerLobby({ onBack }: { onBack: () => void }) {
       setError((currentError) => currentError === "Room not found or expired." ? currentError : "");
       if (data.room.status === "finished") setNotice("Game finished. The final result is shown below.");
     } catch (e) {
-      if (e instanceof MultiplayerRequestError && e.status === 404) {
+      if (e instanceof MultiplayerRequestError && e.status === 429) {
+        pauseUntilRef.current = Date.now() + retryDelayMs(e.payload.retryAfterSeconds);
+        setError("Syncing is paused for a few seconds because of too many requests. It will resume automatically.");
+      } else if (e instanceof MultiplayerRequestError && e.status === 404) {
         saveCredentials(null);
         setRoom(null);
         setError("Room not found or expired. Create or join a room to continue.");
@@ -81,9 +92,17 @@ export function MultiplayerLobby({ onBack }: { onBack: () => void }) {
 
   useEffect(() => {
     if (!credentials || !isOnline || working) return;
-    void refresh();
-    const timer = window.setInterval(() => void refresh(true), 1600);
-    return () => window.clearInterval(timer);
+    let stopped = false;
+    let timer: number | undefined;
+    // Poll quickly while the tab is visible, slowly while hidden, and pause when the server asks us to slow down.
+    const tick = async (quiet: boolean) => {
+      await refresh(quiet);
+      if (stopped) return;
+      const waitMs = Math.max(pollDelayMs(document.hidden), pauseUntilRef.current - Date.now());
+      timer = window.setTimeout(() => void tick(true), waitMs);
+    };
+    void tick(false);
+    return () => { stopped = true; window.clearTimeout(timer); };
   }, [credentials, refresh, working, isOnline]);
 
   const current = room?.state?.players[room.state.currentPlayerIndex];

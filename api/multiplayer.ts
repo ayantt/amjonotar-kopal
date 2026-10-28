@@ -86,14 +86,16 @@ async function autoAdvance(sql: NeonSql, room: RoomRow): Promise<RoomRow> {
   }
 }
 
-/** Which rate rules apply to a request. Reads (polling) and heartbeats are intentionally unlimited. */
+/** Which rate rules apply to a request. Polling reads and heartbeats get generous ceilings so shared addresses keep working. */
 function rulesFor(parts: string[], method: string): readonly RateRule[] | null {
+  if (method === "GET") return parts.length === 2 ? RATE_RULES.roomRead : null;
   if (method !== "POST") return null;
   if (parts.length === 1) return RATE_RULES.createRoom;
   switch (parts[2]) {
     case "join": return RATE_RULES.joinRoom;
     case "actions": return RATE_RULES.action;
     case "forfeit": return RATE_RULES.forfeit;
+    case "heartbeat": return RATE_RULES.heartbeat;
     case "start":
     case "leave": return RATE_RULES.roomAdmin;
     default: return null;

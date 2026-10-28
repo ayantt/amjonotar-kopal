@@ -7,7 +7,7 @@ export interface RateRule {
   windowSeconds: number;
 }
 
-/** Data-driven limits. Polls and heartbeats are deliberately not limited (they are cheap and constant while a game is open). */
+/** Data-driven limits per client address. */
 export const RATE_RULES = {
   createRoom: [
     { bucket: "room-create-minute", limit: 5, windowSeconds: 60 },
@@ -17,6 +17,10 @@ export const RATE_RULES = {
   roomAdmin: [{ bucket: "room-admin", limit: 30, windowSeconds: 60 }],
   action: [{ bucket: "room-action", limit: 300, windowSeconds: 60 }],
   forfeit: [{ bucket: "room-forfeit", limit: 10, windowSeconds: 60 }],
+  // Polling is every ~1.6 s and heartbeats every 5 s per open tab (about 50 requests a minute). The ceilings leave room for
+  // a whole household sharing one address while still capping a flood. Each counted request costs one small write.
+  roomRead: [{ bucket: "room-read", limit: 600, windowSeconds: 60 }],
+  heartbeat: [{ bucket: "room-heartbeat", limit: 120, windowSeconds: 60 }],
   analyticsWrite: [{ bucket: "analytics-write", limit: 120, windowSeconds: 60 }],
   adminAttempt: [{ bucket: "analytics-admin", limit: 20, windowSeconds: 60 }],
 } as const satisfies Record<string, readonly RateRule[]>;

@@ -42,7 +42,7 @@ Exit: several laps can be played with all AI turns resolving reliably and proper
 - [ ] Bangla-facing labels/tutorial/rule reference.
 - [ ] AI pacing controls and decision explanations.
 - [x] Versioned local save (RD-131).
-- [ ] Accessibility pass.
+- [x] Accessibility pass: axe-core audit of menu, game, dialogs, lobby and dashboard at desktop and phone width is clean; dialogs trap and restore focus; reduced-motion respected.
 - [ ] Clean install, test, build, static deployment.
 
 ## Deferred

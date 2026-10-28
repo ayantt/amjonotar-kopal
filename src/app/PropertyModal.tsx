@@ -1,4 +1,5 @@
 import { BOARD } from "../game/board";
+import { useDialogFocus } from "./useDialogFocus";
 import { getBuildingCost, getMortgageTerms } from "../game/engine";
 import { getBaseRent } from "../game/properties";
 import type { GameState } from "../game/types";
@@ -34,12 +35,13 @@ export function PropertyModal({
   onRedeem,
   onSell,
 }: PropertyModalProps) {
+  const dialogRef = useDialogFocus<HTMLElement>();
   const selectedProperty = game.properties[selectedSpace.id];
   const selectedOwner = selectedProperty?.ownerId ? game.players.find((player) => player.id === selectedProperty.ownerId) : undefined;
   const selectedLeaseholder = selectedProperty?.leaseholderId ? game.players.find((player) => player.id === selectedProperty.leaseholderId) : undefined;
 
   return <div className="property-modal-backdrop" role="presentation" onClick={() => onClose()}>
-      <section className="property-modal" role="dialog" aria-modal="true" aria-labelledby="property-modal-title" onClick={(event) => event.stopPropagation()}>
+      <section className="property-modal" ref={dialogRef} tabIndex={-1} role="dialog" aria-modal="true" aria-labelledby="property-modal-title" onClick={(event) => event.stopPropagation()}>
         <header className={`property-modal-header ${selectedSpace.color ? `color-${selectedSpace.color}` : ""}`}>
           <div><span className="property-modal-kicker">PROPERTY REGISTER · {selectedSpace.type.toUpperCase()}</span><h2 id="property-modal-title">{selectedSpace.name}</h2><p>{selectedSpace.subtitle}</p></div>
           <button className="constitution-close" onClick={() => onClose()} aria-label="Close property details">CLOSE ×</button>
