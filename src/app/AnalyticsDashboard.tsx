@@ -53,7 +53,7 @@ export function AnalyticsDashboard({ onBack }: { onBack: () => void }) {
   })) : [], [activity, hourOffset]);
 
   return <main className="app-shell analytics-shell">
-    <header className="masthead"><span className="seal">আ</span><span>ANALYTICS · ADMIN</span><button className="secondary-action" onClick={onBack}>BACK TO GAME ↗</button></header>
+    <header className="masthead"><img className="seal" src="/favicon.svg" alt="" width={34} height={34} /><span>ANALYTICS · ADMIN</span><button className="secondary-action" onClick={onBack}>BACK TO GAME ↗</button></header>
     <section className="analytics-panel">
       <h1>Players &amp; gameplay</h1>
       <p className="analytics-note">Anonymous, per-game data only: no names, IP addresses or room codes are stored, and players are not tracked across games, so counts are games, not people. Single-player results are reported by the browser and are not verified; online results are recorded by the server. Based on the latest 5,000 games.</p>
