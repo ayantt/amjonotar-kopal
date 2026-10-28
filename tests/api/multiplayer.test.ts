@@ -295,4 +295,22 @@ describe("multiplayer rate limiting", () => {
     for (let i = 0; i < 5; i++) await call("rooms", "POST", { name: "A" }, undefined, headers);
     expect((await call("rooms", "POST", { name: "A" }, undefined, { "x-forwarded-for": "192.0.2.1, 10.9.9.9" })).statusCode).toBe(429);
   });
+
+  it("caps polling floods per address but leaves normal polling alone", async () => {
+    await call("rooms", "POST", { name: "Host" });
+    const code = String((db.room as FakeRoom).code);
+    const headers = { "x-real-ip": "203.0.113.50" };
+    for (let i = 0; i < 600; i++) expect((await call(`rooms/${code}`, "GET", {}, undefined, headers)).statusCode).toBe(200);
+    const blocked = await call(`rooms/${code}`, "GET", {}, undefined, headers);
+    expect(blocked.statusCode).toBe(429);
+    expect((await call(`rooms/${code}`, "GET", {}, undefined, { "x-real-ip": "203.0.113.51" })).statusCode).toBe(200);
+  });
+
+  it("caps heartbeat floods per address", async () => {
+    const created = await call("rooms", "POST", { name: "Host" });
+    const code = String((created.body.room as { code: string }).code);
+    const headers = { "x-real-ip": "203.0.113.60" };
+    for (let i = 0; i < 120; i++) expect((await call(`rooms/${code}/heartbeat`, "POST", {}, String(created.body.token), headers)).statusCode).toBe(204);
+    expect((await call(`rooms/${code}/heartbeat`, "POST", {}, String(created.body.token), headers)).statusCode).toBe(429);
+  });
 });

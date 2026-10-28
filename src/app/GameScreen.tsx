@@ -110,7 +110,7 @@ export function GameScreen(props: GameScreenProps) {
       {props.onWordmark
         ? <button className="wordmark" onClick={props.onWordmark} aria-label={props.wordmarkNote}>আমজনতার কপাল<span>{props.wordmarkNote} ↗</span></button>
         : <div className="wordmark">আমজনতার কপাল<span>{props.wordmarkNote}</span></div>}
-      <div className="turn-pill"><span className={isViewerTurn ? "pulse-dot" : "pulse-dot ai-dot"} />{props.turnLabel} · ROUND {game.round}</div>
+      <div className="turn-pill" role="status" aria-live="polite"><span aria-hidden="true" className={isViewerTurn ? "pulse-dot" : "pulse-dot ai-dot"} />{props.turnLabel} · ROUND {game.round}</div>
       <div className="header-actions">
         <button className={`sound-toggle ${props.soundEnabled ? "is-on" : ""}`} type="button" aria-pressed={props.soundEnabled} aria-label={props.soundEnabled ? "Mute sound effects" : "Enable sound effects"} onClick={props.onToggleSound}>{props.soundEnabled ? "SOUND ON ♪" : "SOUND OFF ♫"}</button>
         <button className="constitution-button" onClick={() => setShowConstitution(true)}>সংবিধান <span>RULE BOOK ↗</span></button>
@@ -119,8 +119,8 @@ export function GameScreen(props: GameScreenProps) {
     </header>
     {showConstitution && <Constitution online={online} playerCount={game.players.length} onClose={() => setShowConstitution(false)} />}
     {props.banner}
-    <section className="game-intro"><div><p className="eyebrow">THE PEOPLE PAY. THE POWERFUL PLAY.</p><h1>The board is <em>rigged.</em></h1></div><p>{props.statusMessage}</p></section>
-    {game.phase === "game-over" && <section className="game-over-panel"><strong>GAME OVER</strong><p>{gameOverMessage}</p>{props.gameOverAction}</section>}
+    <section className="game-intro"><div><p className="eyebrow">THE PEOPLE PAY. THE POWERFUL PLAY.</p><h1>The board is <em>rigged.</em></h1></div><p role="status" aria-live="polite">{props.statusMessage}</p></section>
+    {game.phase === "game-over" && <section className="game-over-panel" role="alert"><strong>GAME OVER</strong><p>{gameOverMessage}</p>{props.gameOverAction}</section>}
     <section className="game-layout">
       <EventLog events={feed.displayedEvents} popupsEnabled={feed.popupsEnabled} onTogglePopups={feed.togglePopups} />
       <BoardView
@@ -134,7 +134,7 @@ export function GameScreen(props: GameScreenProps) {
         onToggleFullscreen={() => void toggleFullscreen()}
         onDismissEvent={feed.dismiss}
       />
-      <aside className="sidebar">
+      <section className="sidebar" aria-label="Players and turn controls">
         <section className="panel current-panel"><div className="panel-label">NOW PLAYING</div>
           <div className="current-player"><span className={`large-token ${current.role} player-color-${current.id}`}>{tokenLabel(current, true)}</span><div><h2>{current.name}</h2><p>{roleName(current.role)} · {current.id === viewer.id ? "Your seat" : current.controller === "ai" ? "Computer opponent" : "Online player"}</p></div></div>
           <div className="cash-line"><span>AVAILABLE CASH</span><strong>{money(current.cash)}</strong></div>
@@ -171,7 +171,7 @@ export function GameScreen(props: GameScreenProps) {
           <div className="fund-row"><span>Community cards drawn</span><strong>{game.cardDrawCounts.community}/16</strong></div>
           <div className="fund-row"><span>Chance cards drawn</span><strong>{game.cardDrawCounts.chance}/16</strong></div>
         </section>
-      </aside>
+      </section>
     </section>
     {selectedSpace && <PropertyModal
       game={game}
