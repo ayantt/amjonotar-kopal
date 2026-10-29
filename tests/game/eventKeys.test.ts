@@ -39,4 +39,18 @@ describe("event keys for event-specific media", () => {
     const state = landOn("income-tax");
     expect(state.events.filter((event) => /rolled/.test(event.message) && event.key)).toEqual([]);
   });
+  it("records the role of the player each keyed event is about", () => {
+    const citizen = landOn("income-tax");
+    expect(citizen.events.find((e) => e.key === "space:income-tax")?.role).toBe(citizen.players[0].role);
+    const politician = createNewGame({ humanRole: "politician" });
+    const index = politician.players.findIndex((p) => p.role === "politician");
+    const moved = movePlayer({ ...politician, players: politician.players.map((p, i) => i === index ? { ...p, position: 0 } : p) }, politician.players[index].id, 4);
+    expect(moved.events.find((e) => e.key === "space:income-tax")?.role).toBe("politician");
+  });
+  it("labels forfeits and the winner with their roles", () => {
+    const state = createNewGame({ humanRole: "citizen" });
+    const out = forfeitPlayer(forfeitPlayer(forfeitPlayer(state, "player-2"), "player-3"), "player-4");
+    expect(out.events.find((e) => e.key === "forfeit")?.role).toBeDefined();
+    expect(out.events.find((e) => e.key === "game-over")?.role).toBe(out.players.find((p) => p.id === out.winner)?.role);
+  });
 });
