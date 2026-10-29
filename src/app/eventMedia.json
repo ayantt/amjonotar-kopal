@@ -149,24 +149,40 @@
       "image": "/media/events/card-cc-03.gif",
       "caption": "CC-03 Public Benefit"
     },
-    "card:CC-04": {
-      "image": "/media/events/card-cc-04.gif",
+    "card:CC-04@politician": {
+      "image": "/media/events/card-cc-04-p.gif",
       "caption": "CC-04 Road Repair Levy"
     },
-    "card:CC-05": {
-      "image": "/media/events/card-cc-05.gif",
+    "card:CC-04@citizen": {
+      "image": "/media/events/card-cc-04-c.gif",
+      "caption": "CC-04 Road Repair Levy"
+    },
+    "card:CC-05@politician": {
+      "image": "/media/events/card-cc-05-p.gif",
       "caption": "CC-05 Unexpected Medical Expense"
     },
-    "card:CC-06": {
-      "image": "/media/events/card-cc-06.gif",
+    "card:CC-05@citizen": {
+      "image": "/media/events/card-cc-05-c.gif",
+      "caption": "CC-05 Unexpected Medical Expense"
+    },
+    "card:CC-06@politician": {
+      "image": "/media/events/card-cc-06-p.gif",
+      "caption": "CC-06 Community Donation"
+    },
+    "card:CC-06@citizen": {
+      "image": "/media/events/card-cc-06-c.gif",
       "caption": "CC-06 Community Donation"
     },
     "card:CC-07": {
       "image": "/media/events/card-cc-07.gif",
       "caption": "CC-07 Paperwork Correction"
     },
-    "card:CC-08": {
-      "image": "/media/events/card-cc-08.gif",
+    "card:CC-08@politician": {
+      "image": "/media/events/card-cc-08-p.gif",
+      "caption": "CC-08 Delayed Salary"
+    },
+    "card:CC-08@citizen": {
+      "image": "/media/events/card-cc-08-c.gif",
       "caption": "CC-08 Delayed Salary"
     },
     "card:CC-09": {
@@ -177,28 +193,52 @@
       "image": "/media/events/card-cc-10.gif",
       "caption": "CC-10 Maintenance Notice"
     },
-    "card:CC-11": {
-      "image": "/media/events/card-cc-11.gif",
+    "card:CC-11@politician": {
+      "image": "/media/events/card-cc-11-p.gif",
       "caption": "CC-11 School Fundraiser"
     },
-    "card:CC-12": {
-      "image": "/media/events/card-cc-12.gif",
+    "card:CC-11@citizen": {
+      "image": "/media/events/card-cc-11-c.gif",
+      "caption": "CC-11 School Fundraiser"
+    },
+    "card:CC-12@politician": {
+      "image": "/media/events/card-cc-12-p.gif",
       "caption": "CC-12 Electricity Adjustment"
     },
-    "card:CC-13": {
-      "image": "/media/events/card-cc-13.gif",
+    "card:CC-12@citizen": {
+      "image": "/media/events/card-cc-12-c.gif",
+      "caption": "CC-12 Electricity Adjustment"
+    },
+    "card:CC-13@politician": {
+      "image": "/media/events/card-cc-13-p.gif",
       "caption": "CC-13 Audit"
     },
-    "card:CC-14": {
-      "image": "/media/events/card-cc-14.gif",
+    "card:CC-13@citizen": {
+      "image": "/media/events/card-cc-13-c.gif",
+      "caption": "CC-13 Audit"
+    },
+    "card:CC-14@politician": {
+      "image": "/media/events/card-cc-14-p.gif",
       "caption": "CC-14 Public Contract"
     },
-    "card:CC-15": {
-      "image": "/media/events/card-cc-15.gif",
+    "card:CC-14@citizen": {
+      "image": "/media/events/card-cc-14-c.gif",
+      "caption": "CC-14 Public Contract"
+    },
+    "card:CC-15@politician": {
+      "image": "/media/events/card-cc-15-p.gif",
       "caption": "CC-15 Neighbour Helps Neighbour"
     },
-    "card:CC-16": {
-      "image": "/media/events/card-cc-16.gif",
+    "card:CC-15@citizen": {
+      "image": "/media/events/card-cc-15-c.gif",
+      "caption": "CC-15 Neighbour Helps Neighbour"
+    },
+    "card:CC-16@politician": {
+      "image": "/media/events/card-cc-16-p.gif",
+      "caption": "CC-16 People's Meeting"
+    },
+    "card:CC-16@citizen": {
+      "image": "/media/events/card-cc-16-c.gif",
       "caption": "CC-16 People's Meeting"
     },
     "card:CH-01": {
@@ -213,44 +253,76 @@
       "image": "/media/events/card-ch-03.gif",
       "caption": "CH-03 Tax Rebate"
     },
-    "card:CH-04": {
-      "image": "/media/events/card-ch-04.gif",
+    "card:CH-04@politician": {
+      "image": "/media/events/card-ch-04-p.gif",
       "caption": "CH-04 Road Diversion"
     },
-    "card:CH-05": {
-      "image": "/media/events/card-ch-05.gif",
+    "card:CH-04@citizen": {
+      "image": "/media/events/card-ch-04-c.gif",
+      "caption": "CH-04 Road Diversion"
+    },
+    "card:CH-05@politician": {
+      "image": "/media/events/card-ch-05-p.gif",
+      "caption": "CH-05 Development Project"
+    },
+    "card:CH-05@citizen": {
+      "image": "/media/events/card-ch-05-c.gif",
       "caption": "CH-05 Development Project"
     },
     "card:CH-06": {
       "image": "/media/events/card-ch-06.gif",
       "caption": "CH-06 Public Holiday"
     },
-    "card:CH-07": {
-      "image": "/media/events/card-ch-07.gif",
+    "card:CH-07@politician": {
+      "image": "/media/events/card-ch-07-p.gif",
+      "caption": "CH-07 Broken Water Line"
+    },
+    "card:CH-07@citizen": {
+      "image": "/media/events/card-ch-07-c.gif",
       "caption": "CH-07 Broken Water Line"
     },
     "card:CH-08": {
       "image": "/media/events/card-ch-08.gif",
       "caption": "CH-08 Permit Required"
     },
-    "card:CH-09": {
-      "image": "/media/events/card-ch-09.gif",
+    "card:CH-09@politician": {
+      "image": "/media/events/card-ch-09-p.gif",
       "caption": "CH-09 Transport Strike"
     },
-    "card:CH-10": {
-      "image": "/media/events/card-ch-10.gif",
+    "card:CH-09@citizen": {
+      "image": "/media/events/card-ch-09-c.gif",
+      "caption": "CH-09 Transport Strike"
+    },
+    "card:CH-10@politician": {
+      "image": "/media/events/card-ch-10-p.gif",
       "caption": "CH-10 Favourable Headline"
     },
-    "card:CH-11": {
-      "image": "/media/events/card-ch-11.gif",
+    "card:CH-10@citizen": {
+      "image": "/media/events/card-ch-10-c.gif",
+      "caption": "CH-10 Favourable Headline"
+    },
+    "card:CH-11@politician": {
+      "image": "/media/events/card-ch-11-p.gif",
       "caption": "CH-11 Community Service"
     },
-    "card:CH-12": {
-      "image": "/media/events/card-ch-12.gif",
+    "card:CH-11@citizen": {
+      "image": "/media/events/card-ch-11-c.gif",
+      "caption": "CH-11 Community Service"
+    },
+    "card:CH-12@politician": {
+      "image": "/media/events/card-ch-12-p.gif",
       "caption": "CH-12 Court Date"
     },
-    "card:CH-13": {
-      "image": "/media/events/card-ch-13.gif",
+    "card:CH-12@citizen": {
+      "image": "/media/events/card-ch-12-c.gif",
+      "caption": "CH-12 Court Date"
+    },
+    "card:CH-13@politician": {
+      "image": "/media/events/card-ch-13-p.gif",
+      "caption": "CH-13 Contract Award"
+    },
+    "card:CH-13@citizen": {
+      "image": "/media/events/card-ch-13-c.gif",
       "caption": "CH-13 Contract Award"
     },
     "card:CH-14": {
@@ -261,8 +333,12 @@
       "image": "/media/events/card-ch-15.gif",
       "caption": "CH-15 Public Apology"
     },
-    "card:CH-16": {
-      "image": "/media/events/card-ch-16.gif",
+    "card:CH-16@politician": {
+      "image": "/media/events/card-ch-16-p.gif",
+      "caption": "CH-16 Collective Action"
+    },
+    "card:CH-16@citizen": {
+      "image": "/media/events/card-ch-16-c.gif",
       "caption": "CH-16 Collective Action"
     },
     "pass-go": {
