@@ -122,7 +122,7 @@ export function GameScreen(props: GameScreenProps) {
     <section className="game-intro"><div><p className="eyebrow">THE PEOPLE PAY. THE POWERFUL PLAY.</p><h1>The board is <em>rigged.</em></h1></div><p role="status" aria-live="polite">{props.statusMessage}</p></section>
     {game.phase === "game-over" && <section className="game-over-panel" role="alert"><strong>GAME OVER</strong><p>{gameOverMessage}</p>{props.gameOverAction}</section>}
     <section className="game-layout">
-      <EventLog events={feed.displayedEvents} popupsEnabled={feed.popupsEnabled} onTogglePopups={feed.togglePopups} />
+      <EventLog events={feed.displayedEvents} popupsEnabled={feed.popupsEnabled} onTogglePopups={feed.togglePopups} showPopupToggle={!online} />
       <BoardView
         game={game}
         current={current}
