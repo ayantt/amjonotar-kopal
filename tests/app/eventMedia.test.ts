@@ -15,26 +15,52 @@ const manifest: EventMediaManifest = {
 
 describe("resolveEventMedia", () => {
   it("prefers the exact key, then the kind of space", () => {
-    expect(resolveEventMedia("space:income-tax", manifest)?.video).toBe("/media/events/income-tax.mp4");
-    expect(resolveEventMedia("space:luxury-tax", manifest)?.image).toBe("/media/events/tax.png");
+    expect(resolveEventMedia("space:income-tax", undefined, manifest)?.video).toBe("/media/events/income-tax.mp4");
+    expect(resolveEventMedia("space:luxury-tax", undefined, manifest)?.image).toBe("/media/events/tax.png");
   });
   it("falls back from a specific card to the generic card media", () => {
-    expect(resolveEventMedia("card:cc-3", manifest)?.image).toBe("/media/events/cc3.gif");
-    expect(resolveEventMedia("card:cc-1", manifest)?.audio).toBe("/media/events/card.mp3");
+    expect(resolveEventMedia("card:cc-3", undefined, manifest)?.image).toBe("/media/events/cc3.gif");
+    expect(resolveEventMedia("card:cc-1", undefined, manifest)?.audio).toBe("/media/events/card.mp3");
   });
   it("returns null when nothing is configured or there is no key", () => {
-    expect(resolveEventMedia(undefined, manifest)).toBeNull();
-    expect(resolveEventMedia("space:go", manifest)).toBeNull();
-    expect(resolveEventMedia("space:income-tax", {})).toBeNull();
+    expect(resolveEventMedia(undefined, undefined, manifest)).toBeNull();
+    expect(resolveEventMedia("space:go", undefined, manifest)).toBeNull();
+    expect(resolveEventMedia("space:income-tax", undefined, {})).toBeNull();
   });
   it("refuses paths outside /media/events/, including other sites and traversal", () => {
-    expect(resolveEventMedia("bankrupt", manifest)).toBeNull();
-    expect(resolveEventMedia("forfeit", manifest)).toBeNull();
+    expect(resolveEventMedia("bankrupt", undefined, manifest)).toBeNull();
+    expect(resolveEventMedia("forfeit", undefined, manifest)).toBeNull();
   });
   it("clamps overly long settings", () => {
-    const m = resolveEventMedia("x", { x: { video: "/media/events/a.mp4", maxSeconds: 9999, caption: "c".repeat(500) } });
+    const m = resolveEventMedia("x", undefined, { x: { video: "/media/events/a.mp4", maxSeconds: 9999, caption: "c".repeat(500) } });
     expect(m?.maxSeconds).toBe(60);
     expect(m?.caption?.length).toBe(200);
+  });
+});
+
+describe("role-specific media", () => {
+  const roleManifest: EventMediaManifest = {
+    "space:income-tax": { image: "/media/events/tax-any.gif" },
+    "space:income-tax@politician": { image: "/media/events/tax-happy.gif" },
+    "space:income-tax@citizen": { video: "/media/events/tax-sad.mp4" },
+    "type:tax@citizen": { image: "/media/events/tax-type-sad.gif" },
+  };
+  it("plays the clip for the role of the player the event is about", () => {
+    expect(resolveEventMedia("space:income-tax", "politician", roleManifest)?.image).toBe("/media/events/tax-happy.gif");
+    expect(resolveEventMedia("space:income-tax", "citizen", roleManifest)?.video).toBe("/media/events/tax-sad.mp4");
+  });
+  it("uses the plain entry when the role has no entry of its own", () => {
+    const plain: EventMediaManifest = { "space:income-tax": roleManifest["space:income-tax"] };
+    expect(resolveEventMedia("space:income-tax", "citizen", plain)?.image).toBe("/media/events/tax-any.gif");
+    expect(resolveEventMedia("space:income-tax", undefined, roleManifest)?.image).toBe("/media/events/tax-any.gif");
+  });
+  it("prefers an exact key without a role over a role entry for the kind of space", () => {
+    const m: EventMediaManifest = { "space:income-tax": { image: "/media/events/a.gif" }, "type:tax@citizen": { image: "/media/events/b.gif" } };
+    expect(resolveEventMedia("space:income-tax", "citizen", m)?.image).toBe("/media/events/a.gif");
+    expect(resolveEventMedia("space:luxury-tax", "citizen", m)?.image).toBe("/media/events/b.gif");
+  });
+  it("shows nothing for a role-only entry when the role does not match", () => {
+    expect(resolveEventMedia("space:luxury-tax", "politician", { "type:tax@citizen": { image: "/media/events/b.gif" } })).toBeNull();
   });
 });
 
@@ -49,7 +75,8 @@ describe("popupDurationMs", () => {
 
 describe("the shipped media manifest", () => {
   const generic = ["pass-go", "buy", "build", "bankrupt", "forfeit", "game-over", "card"];
-  const validKey = (key: string) =>
+  const validKey = (full: string) => validBase(full.replace(/@(politician|citizen)$/, ""));
+  const validBase = (key: string) =>
     generic.includes(key) ||
     (key.startsWith("space:") && BOARD.some((space) => space.id === key.slice(6))) ||
     (key.startsWith("type:") && BOARD.some((space) => space.type === key.slice(5))) ||
@@ -60,7 +87,8 @@ describe("the shipped media manifest", () => {
   });
   it("points every entry at a file that exists and passes the path checks", () => {
     for (const [key, entry] of Object.entries(EVENT_MEDIA)) {
-      expect(resolveEventMedia(key), key).not.toBeNull();
+      const role = key.endsWith("@politician") ? "politician" : key.endsWith("@citizen") ? "citizen" : undefined;
+      expect(resolveEventMedia(key.replace(/@(politician|citizen)$/, ""), role), key).not.toBeNull();
       for (const path of [entry.video, entry.image, entry.audio]) if (path) expect(existsSync(`public${path}`), `${key}: ${path}`).toBe(true);
     }
   });

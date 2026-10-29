@@ -69,7 +69,7 @@ export function useEventFeed(events: FeedEvent[], soundEnabled: boolean, resetKe
 
   useEffect(() => {
     if (!activeEvent || !popupsEnabled) return;
-    const media = resolveEventMedia(activeEvent.key);
+    const media = resolveEventMedia(activeEvent.key, activeEvent.role);
     // Event media brings its own sound, so the generic chime only plays for ordinary popups.
     if (!media) playSound(activeEvent.kind === "money" ? "money" : activeEvent.kind === "ai" ? "event" : "turn", soundEnabled);
     setDisplayedEvents((shown) => shown.some((event) => event.id === activeEvent.id) ? shown : [...shown, activeEvent]);
@@ -80,7 +80,7 @@ export function useEventFeed(events: FeedEvent[], soundEnabled: boolean, resetKe
   return {
     displayedEvents,
     activeEvent,
-    activeMedia: activeEvent ? resolveEventMedia(activeEvent.key) : null,
+    activeMedia: activeEvent ? resolveEventMedia(activeEvent.key, activeEvent.role) : null,
     popupsEnabled,
     isPlaying: Boolean(activeEvent) || queue.length > 0,
     togglePopups: () => {

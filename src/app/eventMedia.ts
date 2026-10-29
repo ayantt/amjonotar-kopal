@@ -1,4 +1,5 @@
 import { BOARD } from "../game/board";
+import type { PlayerRole } from "../game/types";
 import manifest from "./eventMedia.json";
 
 /**
@@ -25,10 +26,12 @@ const MAX_SECONDS = 60;
 const SAFE_PATH = /^\/media\/events\/[A-Za-z0-9._-]+$/;
 
 /**
- * Finds the media for an event key. Lookup order: the exact key (`space:income-tax`), then the kind of space
- * (`type:tax`), then the generic `card` key for any card. Returns null when nothing is configured.
+ * Finds the media for an event. Lookup order: the exact key for the player's role (`space:income-tax@politician`), the exact key
+ * for everyone (`space:income-tax`), then the same two for the kind of space (`type:tax@citizen`, `type:tax`), or the generic
+ * `card` key for any card. `role` is the role of the player the event is about, so every viewer sees the same clip.
+ * Returns null when nothing is configured.
  */
-export function resolveEventMedia(key: string | undefined, media: EventMediaManifest = EVENT_MEDIA): EventMedia | null {
+export function resolveEventMedia(key: string | undefined, role?: PlayerRole, media: EventMediaManifest = EVENT_MEDIA): EventMedia | null {
   if (!key) return null;
   const candidates = [key];
   if (key.startsWith("space:")) {
@@ -36,8 +39,10 @@ export function resolveEventMedia(key: string | undefined, media: EventMediaMani
     if (space) candidates.push(`type:${space.type}`);
   } else if (key.startsWith("card:")) candidates.push("card");
   for (const candidate of candidates) {
-    const entry = media[candidate];
-    if (entry && (isSafe(entry.video) || isSafe(entry.image) || isSafe(entry.audio))) return sanitize(entry);
+    for (const name of role ? [`${candidate}@${role}`, candidate] : [candidate]) {
+      const entry = media[name];
+      if (entry && (isSafe(entry.video) || isSafe(entry.image) || isSafe(entry.audio))) return sanitize(entry);
+    }
   }
   return null;
 }

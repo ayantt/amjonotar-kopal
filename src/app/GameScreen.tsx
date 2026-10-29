@@ -1,10 +1,10 @@
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { lazy, Suspense, useEffect, useRef, useState, type ReactNode } from "react";
 import { BOARD } from "../game/board";
 import { getCurrentPlayer, type BuildingAction } from "../game/engine";
 import { getLegalPropertyActions, type PropertyAction } from "../game/properties";
 import type { GameState, PlayerRole } from "../game/types";
 import { BoardView } from "./BoardView";
-import { Constitution } from "./Constitution";
+const Constitution = lazy(() => import("./Constitution").then((module) => ({ default: module.Constitution })));
 import { EventLog } from "./EventLog";
 import type { EventFeed } from "./useEventFeed";
 import { PropertyModal } from "./PropertyModal";
@@ -117,7 +117,7 @@ export function GameScreen(props: GameScreenProps) {
         {props.headerActions}
       </div>
     </header>
-    {showConstitution && <Constitution online={online} playerCount={game.players.length} onClose={() => setShowConstitution(false)} />}
+    {showConstitution && <Suspense fallback={null}><Constitution online={online} playerCount={game.players.length} onClose={() => setShowConstitution(false)} /></Suspense>}
     {props.banner}
     <section className="game-intro"><div><p className="eyebrow">THE PEOPLE PAY. THE POWERFUL PLAY.</p><h1>The board is <em>rigged.</em></h1></div><p role="status" aria-live="polite">{props.statusMessage}</p></section>
     {game.phase === "game-over" && <section className="game-over-panel" role="alert"><strong>GAME OVER</strong><p>{gameOverMessage}</p>{props.gameOverAction}</section>}
