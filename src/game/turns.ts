@@ -1,7 +1,7 @@
-import { BOARD as BOARD_FOR_AI } from "./board";
-import { announce, buildProperty, buyCooperativeProperty, contributeToCooperative, endTurn, getLegalBuildActions, getCurrentPlayer, resolvePropertyAction, rollAndMove } from "./engine";
-import { getLegalPropertyActions } from "./properties";
-import type { GameState, PlayerRole } from "./types";
+import { BOARD as BOARD_FOR_AI } from "./board.js";
+import { announce, buildProperty, buyCooperativeProperty, contributeToCooperative, endTurn, getLegalBuildActions, getCurrentPlayer, resolvePropertyAction, rollAndMove } from "./engine.js";
+import { getLegalPropertyActions } from "./properties.js";
+import type { GameState, PlayerRole } from "./types.js";
 export type RandomSource = () => number;
 
 /** Minimum cash a Citizen AI keeps after buying or leasing. */
