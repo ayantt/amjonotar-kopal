@@ -1,12 +1,8 @@
 {
   "_help": "Maps an event key to media. Files live in public/media/events/ and are referenced as /media/events/<file>. Each entry below points at a SAMPLE placeholder GIF: replace the file (keep the name) or change the path. You can also use \"video\" or \"audio\". Delete an entry to go back to the plain text popup. Add @politician or @citizen to a key (for example \\\"space:income-tax@citizen\\\") to play different media depending on the role of the player the event is about; the entry without a role is used for everyone else. Card spaces (chance and community) use the card keys. See docs/EVENT_MEDIA.md.",
   "events": {
-    "space:income-tax": {
-      "image": "/media/events/space-income-tax.gif",
-      "caption": "Income Tax"
-    },
     "space:rail-1": {
-      "image": "/media/events/space-rail-1.gif",
+      "image": "/media/events/space-rail-1.jpg",
       "caption": "Metro Rail"
     },
     "space:jail": {
@@ -18,7 +14,7 @@
       "caption": "Power Board"
     },
     "space:rail-2": {
-      "image": "/media/events/space-rail-2.gif",
+      "image": "/media/events/space-rail-2.jpeg",
       "caption": "National Express"
     },
     "space:free-parking": {
@@ -274,19 +270,19 @@
       "caption": "Game over"
     },
     "space:income-tax@politician": {
-      "image": "/media/events/space-income-tax-politician.gif",
+      "image": "/media/events/space-income-tax-p.gif",
       "caption": "Income Tax: the politician smiles"
     },
     "space:income-tax@citizen": {
-      "image": "/media/events/space-income-tax-citizen.gif",
+      "image": "/media/events/space-income-tax-c.gif",
       "caption": "Income Tax: the citizen pays"
     },
     "space:luxury-tax@politician": {
-      "image": "/media/events/space-luxury-tax-politician.gif",
+      "image": "/media/events/space-luxury-tax-p.gif",
       "caption": "Development Levy: the politician smiles"
     },
     "space:luxury-tax@citizen": {
-      "image": "/media/events/space-luxury-tax-citizen.gif",
+      "image": "/media/events/space-luxury-tax-c.gif",
       "caption": "Development Levy: the citizen pays"
     }
   }
